@@ -17,6 +17,7 @@ import { ArticleCreate } from "./pages/ArticleCreate"
 import { IssueCreate } from "./pages/IssueCreate"
 import { Cadastre } from "./pages/Cadastre"
 import { Features } from "./pages/Features"
+import { FeaturesUpload } from "./pages/FeaturesUpload"
 export function App() {
   // Remove Syncfusion license validation banner
   useEffect(() => {
@@ -67,6 +68,7 @@ export function App() {
           <Route path="/articles/create" element={<ArticleCreate />} />
           <Route path="/issues/create" element={<IssueCreate />} />
           <Route path="/features" element={<Features />} />
+          <Route path="/features/upload" element={<FeaturesUpload />} />
           <Route path="/cadastre" element={<Cadastre />} />
         </Route>
       </Routes>

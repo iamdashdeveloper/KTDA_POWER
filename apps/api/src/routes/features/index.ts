@@ -1,7 +1,5 @@
 import { FastifyInstance, FastifyRequest, FastifyReply } from "fastify"
-import { parseKML } from "../../utils/kml-parser.js"
-import { parseKMZ } from "../../utils/kmz-parser.js"
-import { parseGeoJSON } from "../../utils/geojson-parser.js"
+import { parseSpatialFile } from "../../utils/spatial-parser.js"
 import path from "path"
 
 export async function featuresRoutes(fastify: FastifyInstance) {
@@ -56,7 +54,8 @@ export async function featuresRoutes(fastify: FastifyInstance) {
     "/features",
     async (request: FastifyRequest<{ Body: any }>, reply: FastifyReply) => {
       try {
-        const { name, projectId, geometry, details, parentId } = request.body
+        const { name, projectId, geometry, details, parentId } =
+          request.body as any
 
         const feature = await fastify.prisma.feature.create({
           data: {
@@ -81,74 +80,161 @@ export async function featuresRoutes(fastify: FastifyInstance) {
     "/features/upload",
     async (request: FastifyRequest, reply: FastifyReply) => {
       try {
-        const data = await request.file()
+        console.log("[Upload] Starting file upload handler")
 
-        if (!data) {
+        // Get the first file from the request
+        const file = await request.file()
+
+        if (!file) {
+          console.error("[Upload] No file found in request")
           return reply.code(400).send({ error: "No file provided" })
         }
 
-        const filename = data.filename
-        const fileBuffer = await data.toBuffer()
+        const filename = file.filename
+        let fileBuffer: Buffer
+
+        try {
+          fileBuffer = await file.toBuffer()
+          console.log(
+            `[Upload] ✓ File read: ${filename} (${fileBuffer.length} bytes)`
+          )
+        } catch (err) {
+          console.error("[Upload] ✗ Failed to read file buffer:", err)
+          return reply.code(400).send({ error: "Failed to read file" })
+        }
+
+        // Log file content preview
+        const preview = fileBuffer.toString("utf-8").substring(0, 300)
+        console.log(`[Upload] File content preview:\n${preview}`)
+
+        // Now get the remaining form fields
+        let projectId: string = ""
+        let detailsStr: string = ""
+
+        try {
+          const parts = request.parts()
+          for await (const part of parts) {
+            if (part.type === "field") {
+              const fieldValue = part.value as string
+              console.log(`[Upload] Field: ${part.fieldname} = ${fieldValue}`)
+              if (part.fieldname === "projectId") {
+                projectId = fieldValue
+              } else if (part.fieldname === "details") {
+                detailsStr = fieldValue
+              }
+            }
+          }
+        } catch (err) {
+          console.log(
+            "[Upload] Note: No form fields found or error reading them, continuing..."
+          )
+        }
+
+        // Determine file type and parse
         const fileType = path.extname(filename).toLowerCase()
+        console.log(`[Upload] File type detected: ${fileType}`)
 
         let features: any[] = []
 
         try {
-          if (fileType === ".kml") {
-            features = await parseKML(fileBuffer)
-          } else if (fileType === ".kmz") {
-            features = await parseKMZ(fileBuffer)
-          } else if (fileType === ".geojson" || fileType === ".json") {
-            features = await parseGeoJSON(fileBuffer)
-          } else {
-            return reply.code(400).send({ error: "Unsupported file type" })
-          }
+          features = await parseSpatialFile(fileBuffer, filename)
 
-          // Get default project or create one
-          let project = await fastify.prisma.project.findFirst()
-          if (!project) {
-            project = await fastify.prisma.project.create({
-              data: {
-                name: "Default Project",
-                description: "Auto-created project for imported features",
-                companyId: "", // Get from auth or first company
-              },
+          console.log(`[Upload] ✓ Parser returned ${features.length} features`)
+
+          if (features.length === 0) {
+            console.warn("[Upload] ⚠ Parser returned 0 features")
+            return reply.code(201).send({
+              success: true,
+              count: 0,
+              features: [],
+              message: "File parsed but contained no features",
             })
           }
 
-          // Save features to database
+          console.log(
+            `[Upload] First feature: ${JSON.stringify(features[0]).substring(0, 200)}...`
+          )
+
+          // Get or create project
+          let project
+          if (projectId) {
+            console.log(`[Upload] Looking for project: ${projectId}`)
+            project = await fastify.prisma.project.findUnique({
+              where: { id: projectId },
+            })
+            if (!project) {
+              console.error(`[Upload] ✗ Project not found: ${projectId}`)
+              return reply.code(404).send({ error: "Project not found" })
+            }
+          } else {
+            console.log(
+              "[Upload] No projectId provided, using first available project"
+            )
+            project = await fastify.prisma.project.findFirst()
+            if (!project) {
+              console.log("[Upload] Creating default project")
+              project = await fastify.prisma.project.create({
+                data: {
+                  name: "Default Project",
+                  description: "Auto-created for imported features",
+                  companyId: "",
+                },
+              })
+            }
+          }
+
+          console.log(`[Upload] Using project: ${project.id} (${project.name})`)
+
+          // Save features
           const savedFeatures = []
           for (const feature of features) {
-            const savedFeature = await fastify.prisma.feature.create({
-              data: {
-                name:
-                  feature.name || feature.properties?.name || "Unnamed Feature",
-                projectId: project.id,
+            try {
+              const featureName =
+                feature.name || feature.properties?.name || "Unnamed"
+              const featureDetails = {
+                ...feature.properties,
+                ...(detailsStr && { uploadDetails: detailsStr }),
+                // Store geometry in details since Unsupported type can't be written through Prisma
                 geometry: feature.geometry,
-                details: feature.properties || {},
-              },
-            })
-            savedFeatures.push(savedFeature)
+              }
+
+              console.log(`  → Creating feature: ${featureName}`)
+
+              const saved = await fastify.prisma.feature.create({
+                data: {
+                  name: featureName,
+                  projectId: project.id,
+                  details: featureDetails || {},
+                },
+              })
+
+              console.log(`    ✓ Saved as ID: ${saved.id}`)
+              savedFeatures.push(saved)
+            } catch (featureErr) {
+              console.error(`    ✗ Error creating feature:`, featureErr)
+              throw featureErr
+            }
           }
 
+          console.log(
+            `[Upload] ✓ SUCCESS: ${savedFeatures.length} features saved`
+          )
           return reply.code(201).send({
             success: true,
             count: savedFeatures.length,
             features: savedFeatures,
           })
-        } catch (parseError) {
-          console.error("Error parsing file:", parseError)
+        } catch (parseErr) {
+          console.error("[Upload] ✗ Error during parse/save:", parseErr)
           return reply.code(400).send({
-            error: "Failed to parse file",
+            error: "Failed to process file",
             message:
-              parseError instanceof Error
-                ? parseError.message
-                : "Unknown error",
+              parseErr instanceof Error ? parseErr.message : "Unknown error",
           })
         }
       } catch (error) {
-        console.error("Error uploading file:", error)
-        return reply.code(500).send({ error: "Failed to upload file" })
+        console.error("[Upload] ✗ CRITICAL ERROR:", error)
+        return reply.code(500).send({ error: "Internal server error" })
       }
     }
   )
@@ -161,7 +247,7 @@ export async function featuresRoutes(fastify: FastifyInstance) {
       reply: FastifyReply
     ) => {
       try {
-        const { name, geometry, details, parentId } = request.body
+        const { name, geometry, details, parentId } = request.body as any
 
         const feature = await fastify.prisma.feature.update({
           where: { id: request.params.id },
