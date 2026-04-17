@@ -10,7 +10,6 @@ export async function featuresRoutes(fastify: FastifyInstance) {
       try {
         const features = await fastify.prisma.feature.findMany({
           include: {
-            project: true,
             subFeatures: true,
           },
         })
@@ -32,7 +31,6 @@ export async function featuresRoutes(fastify: FastifyInstance) {
         const feature = await fastify.prisma.feature.findUnique({
           where: { id: request.params.id },
           include: {
-            project: true,
             subFeatures: true,
             parent: true,
           },
@@ -155,35 +153,22 @@ export async function featuresRoutes(fastify: FastifyInstance) {
             `[Upload] First feature: ${JSON.stringify(features[0]).substring(0, 200)}...`
           )
 
-          // Get or create project
-          let project
-          if (projectId) {
-            console.log(`[Upload] Looking for project: ${projectId}`)
-            project = await fastify.prisma.project.findUnique({
-              where: { id: projectId },
-            })
-            if (!project) {
-              console.error(`[Upload] ✗ Project not found: ${projectId}`)
-              return reply.code(404).send({ error: "Project not found" })
-            }
-          } else {
-            console.log(
-              "[Upload] No projectId provided, using first available project"
-            )
-            project = await fastify.prisma.project.findFirst()
-            if (!project) {
-              console.log("[Upload] Creating default project")
-              project = await fastify.prisma.project.create({
-                data: {
-                  name: "Default Project",
-                  description: "Auto-created for imported features",
-                  companyId: "",
-                },
-              })
-            }
-          }
-
-          console.log(`[Upload] Using project: ${project.id} (${project.name})`)
+          // Create a parent feature for this upload (group all features from this file)
+          const parentFeatureName = filename.replace(/\.[^/.]+$/, "")
+          console.log(`[Upload] Creating parent feature: ${parentFeatureName}`)
+          const parentFeature = await fastify.prisma.feature.create({
+            data: {
+              name: parentFeatureName,
+              projectId: projectId || null,
+              details: {
+                uploadedFile: filename,
+                uploadedAt: new Date().toISOString(),
+                featureCount: features.length,
+                ...(detailsStr && { uploadDetails: detailsStr }),
+              },
+            },
+          })
+          console.log(`[Upload] ✓ Parent feature created: ${parentFeature.id}`)
 
           // Save features
           const savedFeatures = []
@@ -203,8 +188,9 @@ export async function featuresRoutes(fastify: FastifyInstance) {
               const saved = await fastify.prisma.feature.create({
                 data: {
                   name: featureName,
-                  projectId: project.id,
+                  projectId: projectId || null,
                   details: featureDetails || {},
+                  parentId: parentFeature.id,
                 },
               })
 

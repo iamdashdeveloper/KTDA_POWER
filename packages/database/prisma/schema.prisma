@@ -92,7 +92,6 @@ model Project {
   activities  Activity[]
   articles    Article[]
   chatRooms   ChatRoom[]
-  features    Feature[]
   issues      Issue[]
   columns     KanbanColumn[]
   company     Company                  @relation(fields: [companyId], references: [id])
@@ -101,7 +100,7 @@ model Project {
 
 model Feature {
   id          String                   @id @default(cuid())
-  projectId   String
+  projectId   String?
   name        String
   geometry    Unsupported("geometry")?
   details     Json                     @default("{}")
@@ -110,7 +109,6 @@ model Feature {
   parentId    String?
   parent      Feature?                 @relation("FeatureHierarchy", fields: [parentId], references: [id])
   subFeatures Feature[]                @relation("FeatureHierarchy")
-  project     Project                  @relation(fields: [projectId], references: [id])
   issues      Issue[]
   schedules   MaintenanceSchedule[]
 }

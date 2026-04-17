@@ -92,16 +92,16 @@ model Project {
   activities  Activity[]
   articles    Article[]
   chatRooms   ChatRoom[]
-  features    Feature[]
   issues      Issue[]
   columns     KanbanColumn[]
+  complaints  Complaint[]
   company     Company                  @relation(fields: [companyId], references: [id])
   members     ProjectMember[]
 }
 
 model Feature {
   id          String                   @id @default(cuid())
-  projectId   String
+  projectId   String?
   name        String
   geometry    Unsupported("geometry")?
   details     Json                     @default("{}")
@@ -110,7 +110,6 @@ model Feature {
   parentId    String?
   parent      Feature?                 @relation("FeatureHierarchy", fields: [parentId], references: [id])
   subFeatures Feature[]                @relation("FeatureHierarchy")
-  project     Project                  @relation(fields: [projectId], references: [id])
   issues      Issue[]
   schedules   MaintenanceSchedule[]
 }
@@ -337,7 +336,6 @@ model Owner {
   metadata   Json        @default("{}")
   createdAt  DateTime    @default(now())
   updatedAt  DateTime    @updatedAt
-  complaints Complaint[]
   feedbacks  Feedback[]
   parcels    Parcel[]
 }
@@ -353,28 +351,25 @@ model Parcel {
   metadata    Json                     @default("{}")
   createdAt   DateTime                 @default(now())
   updatedAt   DateTime                 @updatedAt
-  complaints  Complaint[]
   feedbacks   Feedback[]
   owner       Owner                    @relation(fields: [ownerId], references: [id], onDelete: Cascade)
 }
 
 model Complaint {
-  id            String                   @id @default(cuid())
-  parcelId      String
-  ownerId       String
-  complaintType String
-  title         String
-  description   String
-  severity      String                   @default("medium")
-  status        String                   @default("open")
-  location      Unsupported("geometry")?
-  images        String[]                 @default([])
-  metadata      Json                     @default("{}")
-  createdAt     DateTime                 @default(now())
-  updatedAt     DateTime                 @updatedAt
-  owner         Owner                    @relation(fields: [ownerId], references: [id], onDelete: Cascade)
-  parcel        Parcel                   @relation(fields: [parcelId], references: [id], onDelete: Cascade)
-  feedbacks     Feedback[]
+  id                 String                   @id @default(cuid())
+  phoneNumber        String
+  complaintType      String
+  description        String
+  plotNumber         String?
+  name               String
+  projectId          String
+  severity           String                   @default("medium")
+  status             String                   @default("open")
+  metadata           Json                     @default("{}")
+  createdAt          DateTime                 @default(now())
+  updatedAt          DateTime                 @updatedAt
+  project            Project                  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  feedbacks          Feedback[]
 }
 
 model Feedback {

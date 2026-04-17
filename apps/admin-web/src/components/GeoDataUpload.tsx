@@ -1,21 +1,9 @@
-import { useState, useRef, useEffect } from "react"
+import { useState, useRef } from "react"
 import { Button } from "@workspace/ui/components/button"
 import { Textarea } from "@workspace/ui/components/textarea"
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@workspace/ui/components/select"
 import { toast } from "sonner"
 import { Upload, X, FileJson, MapPin } from "lucide-react"
 import { apiClient } from "../lib/api"
-
-interface Project {
-  id: string
-  name: string
-}
 
 interface GeoDataUploadProps {
   onUploadSuccess?: (count: number) => void
@@ -29,30 +17,8 @@ export function GeoDataUpload({
   const [selectedFile, setSelectedFile] = useState<File | null>(null)
   const [uploadLoading, setUploadLoading] = useState(false)
   const [dragActive, setDragActive] = useState(false)
-  const [projects, setProjects] = useState<Project[]>([])
-  const [projectsLoading, setProjectsLoading] = useState(true)
-  const [selectedProjectId, setSelectedProjectId] = useState<string>("")
   const [details, setDetails] = useState("")
   const fileInputRef = useRef<HTMLInputElement>(null)
-
-  useEffect(() => {
-    fetchProjects()
-  }, [])
-
-  const fetchProjects = async () => {
-    try {
-      const response = await apiClient.get("/projects")
-      setProjects(response.data || [])
-      if (response.data && response.data.length > 0) {
-        setSelectedProjectId(response.data[0].id)
-      }
-    } catch (error) {
-      console.error("Error fetching projects:", error)
-      toast.error("Failed to load projects")
-    } finally {
-      setProjectsLoading(false)
-    }
-  }
 
   const acceptedFileTypes = [
     "application/vnd.google-earth.kml+xml",
@@ -122,16 +88,10 @@ export function GeoDataUpload({
       return
     }
 
-    if (!selectedProjectId) {
-      toast.error("Please select a project")
-      return
-    }
-
     try {
       setUploadLoading(true)
       const formData = new FormData()
       formData.append("file", selectedFile)
-      formData.append("projectId", selectedProjectId)
       if (details) {
         formData.append("details", details)
       }
@@ -283,28 +243,6 @@ export function GeoDataUpload({
         {selectedFile && (
           <div className="space-y-4 rounded-lg border bg-card p-6">
             <div>
-              <label className="mb-2 block text-sm font-medium">Project</label>
-              <Select
-                value={selectedProjectId}
-                onValueChange={setSelectedProjectId}
-              >
-                <SelectTrigger disabled={projectsLoading}>
-                  <SelectValue placeholder="Select a project" />
-                </SelectTrigger>
-                <SelectContent>
-                  {projects.map((project) => (
-                    <SelectItem key={project.id} value={project.id}>
-                      {project.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <p className="mt-1 text-xs text-muted-foreground">
-                Features will be added to the selected project
-              </p>
-            </div>
-
-            <div>
               <label className="mb-2 block text-sm font-medium">
                 Details (Optional)
               </label>
@@ -338,7 +276,7 @@ export function GeoDataUpload({
           </Button>
           <Button
             onClick={handleUpload}
-            disabled={!selectedFile || uploadLoading || !selectedProjectId}
+            disabled={!selectedFile || uploadLoading}
             className="gap-2"
           >
             {uploadLoading ? (
