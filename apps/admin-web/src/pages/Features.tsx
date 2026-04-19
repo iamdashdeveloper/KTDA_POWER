@@ -11,7 +11,8 @@ import type { Feature } from "../types/feature"
 
 export function Features() {
   const navigate = useNavigate()
-  const [features, setFeatures] = useState<Feature[]>([])
+  const [featureGroups, setFeatureGroups] = useState<any[]>([])
+  const [allFeatures, setAllFeatures] = useState<Feature[]>([]) // Flattened for table display
   const [loading, setLoading] = useState(true)
   const [visibleLayers, setVisibleLayers] = useState<Set<string>>(new Set())
 
@@ -23,14 +24,22 @@ export function Features() {
     try {
       setLoading(true)
       const response = await apiClient.get("/features")
-      const data = response.data || []
-      setFeatures(data)
+      const groups = response.data || []
+      setFeatureGroups(groups)
 
-      // Auto-show all parent layers on first load
-      if (data.length > 0 && visibleLayers.size === 0) {
-        const parentIds = new Set<string>(
-          data.filter((f: Feature) => !f.parentId).map((f: Feature) => f.id)
-        )
+      // Flatten all features for table display
+      const flattened: Feature[] = []
+      for (const group of groups) {
+        flattened.push(group) // Add parent group
+        if (group.children) {
+          flattened.push(...group.children) // Add all children
+        }
+      }
+      setAllFeatures(flattened)
+
+      // Auto-show all parent groups on first load
+      if (groups.length > 0 && visibleLayers.size === 0) {
+        const parentIds = new Set<string>(groups.map((g: any) => g.id))
         setVisibleLayers(parentIds)
       }
     } catch (error) {
@@ -49,6 +58,17 @@ export function Features() {
       newVisibleLayers.add(featureId)
     }
     setVisibleLayers(newVisibleLayers)
+  }
+
+  const handleFeatureDelete = async (featureId: string) => {
+    try {
+      await apiClient.delete(`/features/${featureId}`)
+      toast.success("Feature deleted successfully")
+      fetchFeatures()
+    } catch (error) {
+      console.error("Error deleting feature:", error)
+      toast.error("Failed to delete feature")
+    }
   }
 
   if (loading) {
@@ -84,7 +104,7 @@ export function Features() {
       <div className="flex flex-1 gap-4 overflow-hidden p-4">
         {/* Map area (70%) */}
         <div className="flex-1 overflow-hidden rounded-lg border bg-gray-50">
-          {features.length === 0 ? (
+          {featureGroups.length === 0 ? (
             <div className="flex h-full w-full items-center justify-center">
               <div className="text-center">
                 <p className="mb-4 text-muted-foreground">
@@ -100,7 +120,7 @@ export function Features() {
             </div>
           ) : (
             <FeatureMap
-              features={features}
+              featureGroups={featureGroups}
               visibleLayers={visibleLayers}
               onFeatureSelect={(feature) => console.log("Selected:", feature)}
             />
@@ -110,9 +130,10 @@ export function Features() {
         {/* Sidebar (25%) - Layer Control */}
         <div className="w-80 overflow-hidden rounded-lg border bg-background">
           <LayerControl
-            features={features}
+            featureGroups={featureGroups}
             visibleLayers={visibleLayers}
             onLayerToggle={handleLayerToggle}
+            onFeatureDelete={handleFeatureDelete}
           />
         </div>
       </div>
@@ -120,7 +141,7 @@ export function Features() {
       {/* Bottom panel - Data Table */}
       <div className="flex-shrink-0 border-t">
         <DataTablePanel
-          features={features}
+          features={allFeatures}
           onFeatureSelect={(feature) => console.log("Selected:", feature)}
           onFeaturesChange={fetchFeatures}
         />

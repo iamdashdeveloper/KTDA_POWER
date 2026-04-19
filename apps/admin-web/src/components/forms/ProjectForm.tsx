@@ -15,7 +15,7 @@ import {
 import {
   ProjectFormSchema,
   type ProjectFormData,
-} from "@workspace/database/validations"
+} from "@workspace/ui/validations"
 import { JsonMetadataEditor } from "./JsonMetadataEditor"
 import { GeometryPicker } from "./GeometryPicker"
 import { ImageUploader } from "../ImageUploader"

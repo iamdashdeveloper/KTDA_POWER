@@ -16,6 +16,7 @@ import { CompanyCreate } from "./pages/CompanyCreate"
 import { ArticleCreate } from "./pages/ArticleCreate"
 import { IssueCreate } from "./pages/IssueCreate"
 import { Cadastre } from "./pages/Cadastre"
+import { Complaints } from "./pages/Complaints"
 import { Features } from "./pages/Features"
 import { FeaturesUpload } from "./pages/FeaturesUpload"
 export function App() {
@@ -70,6 +71,7 @@ export function App() {
           <Route path="/features" element={<Features />} />
           <Route path="/features/upload" element={<FeaturesUpload />} />
           <Route path="/cadastre" element={<Cadastre />} />
+          <Route path="/complaints" element={<Complaints />} />
         </Route>
       </Routes>
     </BrowserRouter>

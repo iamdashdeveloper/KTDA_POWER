@@ -123,10 +123,40 @@ async function processUSSDRequest(
 
       if (owner) {
         session.owner = owner
-        response = `CON Welcome back, ${owner.name}!
-Do you want to report an issue?
-1. Report on my registered plot (${owner.name})
-2. Report on a different plot`
+
+        // Fetch all parcels owned by this user
+        try {
+          const ownedParcels = await prisma.parcel.findMany({
+            where: {
+              ownerId: owner.id,
+            },
+            select: {
+              id: true,
+              name: true,
+            },
+          })
+
+          if (ownedParcels && ownedParcels.length > 0) {
+            session.ownedParcels = ownedParcels
+
+            // Build parcel selection menu
+            let parcelMenu = `CON Welcome back, ${owner.name}!\nSelect your plot:\n`
+            ownedParcels.forEach((parcel: { name: any }, index: number) => {
+              parcelMenu += `${index + 1}. ${parcel.name}\n`
+            })
+            parcelMenu += `${ownedParcels.length + 1}. Report on a different plot`
+
+            response = parcelMenu
+          } else {
+            // No parcels owned, ask for plot number
+            response = `CON Welcome back, ${owner.name}!
+Enter your plot number (or type 'landmark' if you don't know):`
+          }
+        } catch (error: any) {
+          console.debug("Error fetching parcels:", error.code)
+          response = `CON Welcome back, ${owner.name}!
+Enter your plot number (or type 'landmark' if you don't know):`
+        }
       } else {
         // New user - ask for name
         response = `CON First time here! Please enter your name:`
@@ -153,14 +183,16 @@ Do you want to report an issue?
 
       response = `CON Thank you, ${session.userName}!
 Now enter your plot number (or type 'landmark' if you don't know):`
-    } else if (session.owner) {
-      // Existing user choosing plot
-      const plotChoice = secondInput
+    } else if (session.owner && session.ownedParcels) {
+      // Existing user choosing from owned parcels
+      const parcelChoice = parseInt(secondInput)
+      const parcelsCount = session.ownedParcels.length
 
-      if (plotChoice === "1") {
-        // Use registered plot
-        session.plotNumber = session.owner.name
-        session.skipPlotSelection = true
+      if (parcelChoice > 0 && parcelChoice <= parcelsCount) {
+        // Selected one of the owned parcels
+        const selectedParcel = session.ownedParcels[parcelChoice - 1]
+        session.selectedParcel = selectedParcel
+        session.plotNumber = selectedParcel.name
 
         // Get projects
         try {
@@ -181,14 +213,20 @@ Now enter your plot number (or type 'landmark' if you don't know):`
           console.debug("Project table not accessible:", error.code)
           response = `END Error loading projects. Please try again later.`
         }
-      } else if (plotChoice === "2") {
-        // Enter different plot
+      } else if (parcelChoice === parcelsCount + 1) {
+        // Report on a different plot
         response = `CON Enter your plot number (or type 'landmark' if you don't know):`
       } else {
-        response = `CON Invalid selection. Please try again.
-1. Report on my registered plot (${session.owner.name})
-2. Report on a different plot`
+        response =
+          `CON Invalid selection. Please try again:\n` +
+          session.ownedParcels
+            .map((p: any, i: number) => `${i + 1}. ${p.name}`)
+            .join("\n") +
+          `\n${parcelsCount + 1}. Report on a different plot`
       }
+    } else if (session.owner) {
+      // Existing user but no parcels list (shouldn't happen, but fallback)
+      response = `CON Enter your plot number (or type 'landmark' if you don't know):`
     }
   }
 
@@ -196,8 +234,8 @@ Now enter your plot number (or type 'landmark' if you don't know):`
   else if (currentStep === 3) {
     const thirdInput = inputChain[2]
 
-    if (session.skipPlotSelection) {
-      // Existing user, selecting project
+    if (session.selectedParcel) {
+      // Existing user already selected a parcel, now selecting project
       const projectIndex = parseInt(thirdInput) - 1
 
       if (
@@ -327,7 +365,50 @@ Now enter your plot number (or type 'landmark' if you don't know):`
 
         // Submit the complaint
         try {
-          const complaintPayload = {
+          // Create or get owner by phone number
+          let owner = await prisma.owner.findFirst({
+            where: {
+              phone: phoneNumber,
+            },
+          })
+
+          if (!owner) {
+            // Create a new owner if doesn't exist
+            owner = await prisma.owner.create({
+              data: {
+                name:
+                  session.userName ||
+                  session.owner?.name ||
+                  `User ${phoneNumber}`,
+                phone: phoneNumber,
+                email: `${phoneNumber}@ktda.local`, // Temporary email format
+              },
+            })
+          }
+
+          // Try to get parcel by plotNumber, or create a default parcel
+          let parcel = null
+          if (session.plotNumber) {
+            parcel = await prisma.parcel.findFirst({
+              where: {
+                name: session.plotNumber,
+              },
+            })
+          }
+
+          if (!parcel) {
+            // Create a default parcel if it doesn't exist
+            parcel = await prisma.parcel.create({
+              data: {
+                name: session.plotNumber || `Plot-${phoneNumber}`,
+                ownerId: owner.id,
+                description: "Created via USSD complaint submission",
+              },
+            })
+          }
+
+          // Prepare complaint data based on whether a project was selected
+          let complaintData: any = {
             phoneNumber,
             name: session.userName || session.owner?.name || "USSD User",
             complaintType:
@@ -341,12 +422,38 @@ Now enter your plot number (or type 'landmark' if you don't know):`
               ] ||
               "No description provided",
             plotNumber: session.plotNumber || null,
-            projectId: session.selectedProject?.id || null,
             severity: session.severity || "medium",
+            ownerId: owner.id,
+            parcelId: parcel.id,
+          }
+
+          // Only set projectId if a project was selected, otherwise create a placeholder project
+          if (session.selectedProject?.id) {
+            complaintData.projectId = session.selectedProject.id
+          } else {
+            // Create or connect to a default project for complaints without a specific project
+            const defaultProject = await prisma.project.findFirst({
+              where: { name: "General Complaints" },
+            })
+
+            if (defaultProject) {
+              complaintData.projectId = defaultProject.id
+            } else {
+              // Create a default project if it doesn't exist
+              const newProject = await prisma.project.create({
+                data: {
+                  name: "General Complaints",
+                  companyId: (await prisma.company.findFirst())?.id || "",
+                  description:
+                    "Default project for complaints without a specific project",
+                },
+              })
+              complaintData.projectId = newProject.id
+            }
           }
 
           const result = await prisma.complaint.create({
-            data: complaintPayload,
+            data: complaintData,
             include: {
               project: {
                 select: {

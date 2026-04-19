@@ -133,7 +133,7 @@ export function RootLayout() {
       href: "/cadastre",
       icon: AlertCircle,
       actions: [
-        { label: "Complaints", href: "/cadastre/complaints", icon: Plus },
+        { label: "Complaints", href: "/complaints", icon: Plus },
         { label: "Send Feedback", href: "/cadastre/feedback", icon: Edit },
         { label: "Resolve Issue", href: "/cadastre/resolve", icon: Trash2 },
       ],

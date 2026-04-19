@@ -82,3 +82,44 @@ export function isValidLongitude(lon: number): boolean {
 export function isValidPoint(point: Point): boolean {
   return isValidLatitude(point.latitude) && isValidLongitude(point.longitude)
 }
+
+/**
+ * Convert PostGIS geometry to GeoJSON geometry
+ * Handles geometry objects returned by Prisma/PostGIS
+ */
+export function postgisToGeoJSON(geometry: any): any {
+  if (!geometry) return null
+
+  try {
+    // If it's already in GeoJSON format, return as-is
+    if (
+      geometry.type &&
+      (geometry.type === "Point" ||
+        geometry.type === "LineString" ||
+        geometry.type === "Polygon" ||
+        geometry.type === "MultiPoint" ||
+        geometry.type === "MultiLineString" ||
+        geometry.type === "MultiPolygon")
+    ) {
+      return geometry
+    }
+
+    // If it's a PostGIS object with coordinates property
+    if (geometry.coordinates) {
+      return geometry
+    }
+
+    // If it's a string (WKT format), we need to parse it
+    if (typeof geometry === "string") {
+      // This would require a WKT parser library
+      console.warn("WKT geometry format not yet supported:", geometry)
+      return null
+    }
+
+    console.warn("Unknown geometry format:", geometry)
+    return null
+  } catch (error) {
+    console.error("Error converting PostGIS geometry to GeoJSON:", error)
+    return null
+  }
+}

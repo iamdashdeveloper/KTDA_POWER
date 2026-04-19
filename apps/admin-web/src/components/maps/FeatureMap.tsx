@@ -13,18 +13,18 @@ import "ol/ol.css"
 import type { Feature } from "../../types/feature"
 
 interface FeatureMapProps {
-  features: Feature[]
+  featureGroups: any[] // Parent groups with children array
   visibleLayers: Set<string>
   onFeatureSelect?: (feature: Feature) => void
 }
 
-const getGeometryFromFeature = (feature: Feature): any => {
+const getGeometryFromFeature = (feature: any): any => {
   if (feature.geometry) return feature.geometry
   if (feature.details?.geometry) return feature.details.geometry
   return null
 }
 
-const createOLFeature = (feature: Feature): OLFeature | null => {
+const createOLFeature = (feature: any): OLFeature | null => {
   const geometry = getGeometryFromFeature(feature)
   if (!geometry) return null
 
@@ -32,6 +32,22 @@ const createOLFeature = (feature: Feature): OLFeature | null => {
     const geoJSONFormat = new GeoJSON({
       featureProjection: "EPSG:3857",
     })
+
+    // Validate geometry is an object, not a string or null
+    if (typeof geometry !== "object" || geometry === null) {
+      console.debug(
+        `[FeatureMap] Skipping ${feature.name}: geometry is not an object (type: ${typeof geometry})`
+      )
+      return null
+    }
+
+    // Validate geometry has a type property
+    if (!geometry.type) {
+      console.debug(
+        `[FeatureMap] Skipping ${feature.name}: geometry missing type property. Keys: ${Object.keys(geometry).join(", ")}`
+      )
+      return null
+    }
 
     const geoJSONFeature: any = {
       type: "Feature",
@@ -45,13 +61,24 @@ const createOLFeature = (feature: Feature): OLFeature | null => {
 
     return geoJSONFormat.readFeature(geoJSONFeature) as OLFeature
   } catch (error) {
-    console.error(`Failed to create OL feature for ${feature.name}:`, error)
+    console.error(
+      `[FeatureMap] Failed to create OL feature for ${feature.name}:`,
+      {
+        error: error instanceof Error ? error.message : String(error),
+        geometryType: typeof geometry,
+        geometryKeys:
+          geometry && typeof geometry === "object"
+            ? Object.keys(geometry)
+            : "N/A",
+        geometry: geometry,
+      }
+    )
     return null
   }
 }
 
 export function FeatureMap({
-  features,
+  featureGroups,
   visibleLayers,
   onFeatureSelect,
 }: FeatureMapProps) {
@@ -129,9 +156,19 @@ export function FeatureMap({
       )
       if (feature && onFeatureSelect) {
         const props = feature.getProperties()
-        const originalFeature = features.find((f) => f.id === props.id)
-        if (originalFeature) {
-          onFeatureSelect(originalFeature)
+        // Search through all groups and children
+        for (const group of featureGroups) {
+          if (group.id === props.id) {
+            onFeatureSelect(group)
+            return
+          }
+          if (group.children) {
+            const child = group.children.find((c: any) => c.id === props.id)
+            if (child) {
+              onFeatureSelect(child)
+              return
+            }
+          }
         }
       }
     })
@@ -142,7 +179,7 @@ export function FeatureMap({
         map.current = null
       }
     }
-  }, [features, onFeatureSelect])
+  }, [featureGroups, onFeatureSelect])
 
   // Update features and visibility
   useEffect(() => {
@@ -150,23 +187,26 @@ export function FeatureMap({
 
     vectorSource.current.clear()
 
-    const visibleFeatures = features.filter(
-      (feature) =>
-        !feature.parentId && // Only show parent features on map
-        visibleLayers.has(feature.id)
-    )
+    // Flatten all child features from visible parent groups
+    const allChildren: any[] = []
+    for (const group of featureGroups) {
+      if (visibleLayers.has(group.id) && group.children) {
+        allChildren.push(...group.children)
+      }
+    }
 
     console.log("[FeatureMap] Rendering:", {
-      totalFeatures: features.length,
+      totalGroups: featureGroups.length,
       visibleLayers: Array.from(visibleLayers),
-      visibleFeatures: visibleFeatures.map((f) => ({
+      allChildren: allChildren.map((f: any) => ({
         id: f.id,
         name: f.name,
+        parentId: f.parentId,
         hasGeometry: !!getGeometryFromFeature(f),
       })),
     })
 
-    for (const feature of visibleFeatures) {
+    for (const feature of allChildren) {
       const olFeature = createOLFeature(feature)
       if (olFeature) {
         vectorSource.current.addFeature(olFeature)
@@ -178,13 +218,13 @@ export function FeatureMap({
     }
 
     // Auto-fit to features if any visible
-    if (visibleFeatures.length > 0 && map.current) {
+    if (allChildren.length > 0 && map.current) {
       const extent = vectorSource.current.getExtent()
       if (extent && extent[0] !== Infinity) {
         map.current.getView().fit(extent, { padding: [50, 50, 50, 50] })
       }
     }
-  }, [features, visibleLayers])
+  }, [featureGroups, visibleLayers])
 
   return (
     <div

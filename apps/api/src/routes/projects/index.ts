@@ -137,7 +137,8 @@ export async function projectsRoutes(fastify: FastifyInstance) {
           ...(metadata && { metadata }),
           ...(status && { status }),
           ...(images && { images }),
-          ...(location && { location }),
+          // Note: PostGIS geometry fields (location) cannot be updated directly through Prisma
+          // They require raw SQL queries. Location updates should be handled separately if needed.
         }
 
         const project = await fastify.prisma.project.update({
@@ -169,7 +170,8 @@ export async function projectsRoutes(fastify: FastifyInstance) {
           ...(metadata && { metadata }),
           ...(status && { status }),
           ...(images && { images }),
-          ...(location && { location }),
+          // Note: PostGIS geometry fields (location) cannot be updated directly through Prisma
+          // They require raw SQL queries. Location updates should be handled separately if needed.
         }
 
         const project = await fastify.prisma.project.update({

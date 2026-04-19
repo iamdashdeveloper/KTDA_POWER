@@ -1,20 +1,94 @@
 import { FastifyInstance, FastifyRequest, FastifyReply } from "fastify"
 import { parseSpatialFile } from "../../utils/spatial-parser.js"
+import { postgisToGeoJSON } from "../../utils/geospatial.js"
 import path from "path"
 
+/**
+ * Convert feature geometry to GeoJSON format
+ */
+function normalizeFeatureGeometry(feature: any): any {
+  if (!feature) return feature
+
+  return {
+    ...feature,
+    geometry: feature.geometry ? postgisToGeoJSON(feature.geometry) : null,
+    subFeatures: feature.subFeatures
+      ? feature.subFeatures.map((sf: any) => normalizeFeatureGeometry(sf))
+      : undefined,
+  }
+}
+
 export async function featuresRoutes(fastify: FastifyInstance) {
-  // Get all features
+  // Get all features with geometry (returns child features grouped by parent)
   fastify.get(
     "/features",
     async (request: FastifyRequest, reply: FastifyReply) => {
       try {
-        const features = await fastify.prisma.feature.findMany({
-          include: {
-            subFeatures: true,
-          },
+        // Fetch all parent features (groups)
+        const parentFeatures = (await fastify.prisma.$queryRaw`
+          SELECT 
+            id,
+            "projectId",
+            name,
+            details,
+            "createdAt",
+            "parentId"
+          FROM "Feature"
+          WHERE "parentId" IS NULL
+          ORDER BY "createdAt" DESC
+        `) as any[]
+
+        // Fetch all child features with geometry
+        const childFeatures = (await fastify.prisma.$queryRaw`
+          SELECT 
+            id,
+            "projectId",
+            name,
+            CASE 
+              WHEN geometry IS NOT NULL THEN ST_AsGeoJSON(geometry)::jsonb
+              ELSE NULL
+            END as geometry,
+            details,
+            "createdAt",
+            images,
+            "parentId"
+          FROM "Feature"
+          WHERE "parentId" IS NOT NULL
+          AND geometry IS NOT NULL
+          ORDER BY "createdAt" DESC
+        `) as any[]
+
+        console.log(
+          `[Features] Fetched ${parentFeatures.length} parent groups and ${childFeatures.length} child features with geometry`
+        )
+
+        // Group child features by parent
+        const featuresGroupedByParent = parentFeatures.map((parent) => {
+          const children = childFeatures.filter(
+            (child) => child.parentId === parent.id
+          )
+
+          console.log(
+            `  Parent: "${parent.name}" (${parent.id}) → ${children.length} children with geometry`
+          )
+
+          return {
+            ...parent,
+            isGroup: true,
+            children: children.map((child: any) => ({
+              ...child,
+              geometry: child.geometry
+                ? typeof child.geometry === "string"
+                  ? JSON.parse(child.geometry)
+                  : child.geometry
+                : null,
+            })),
+          }
         })
-        return reply.send(features)
+
+        return reply.send(featuresGroupedByParent)
       } catch (error) {
+        console.error("[Features] Error fetching features:", error)
         return reply.code(500).send({ error: "Failed to fetch features" })
       }
     }
@@ -28,20 +102,99 @@ export async function featuresRoutes(fastify: FastifyInstance) {
       reply: FastifyReply
     ) => {
       try {
-        const feature = await fastify.prisma.feature.findUnique({
-          where: { id: request.params.id },
-          include: {
-            subFeatures: true,
-            parent: true,
-          },
-        })
+        // Use raw SQL to get PostGIS geometry as GeoJSON
+        const features = (await fastify.prisma.$queryRaw`
+          SELECT 
+            id,
+            "projectId",
+            name,
+            CASE 
+              WHEN geometry IS NOT NULL THEN ST_AsGeoJSON(geometry)::jsonb
+              ELSE NULL
+            END as geometry,
+            details,
+            "createdAt",
+            images,
+            "parentId"
+          FROM "Feature"
+          WHERE id = ${request.params.id}
+        `) as any[]
 
-        if (!feature) {
+        if (features.length === 0) {
           return reply.code(404).send({ error: "Feature not found" })
         }
 
-        return reply.send(feature)
+        const feature = features[0]
+
+        // Fetch subfeatures
+        const subFeatures = (await fastify.prisma.$queryRaw`
+          SELECT 
+            id,
+            "projectId",
+            name,
+            CASE 
+              WHEN geometry IS NOT NULL THEN ST_AsGeoJSON(geometry)::jsonb
+              ELSE NULL
+            END as geometry,
+            details,
+            "createdAt",
+            images,
+            "parentId"
+          FROM "Feature"
+          WHERE "parentId" = ${request.params.id}
+          ORDER BY "createdAt" DESC
+        `) as any[]
+
+        // Fetch parent feature if it exists
+        let parent = null
+        if (feature.parentId) {
+          const parentFeatures = (await fastify.prisma.$queryRaw`
+            SELECT 
+              id,
+              "projectId",
+              name,
+              CASE 
+                WHEN geometry IS NOT NULL THEN ST_AsGeoJSON(geometry)::jsonb
+                ELSE NULL
+              END as geometry,
+              details,
+              "createdAt",
+              images,
+              "parentId"
+            FROM "Feature"
+            WHERE id = ${feature.parentId}
+          `) as any[]
+          parent = parentFeatures.length > 0 ? parentFeatures[0] : null
+        }
+
+        return reply.send({
+          ...feature,
+          geometry: feature.geometry
+            ? typeof feature.geometry === "string"
+              ? JSON.parse(feature.geometry)
+              : feature.geometry
+            : null,
+          parent: parent
+            ? {
+                ...parent,
+                geometry: parent.geometry
+                  ? typeof parent.geometry === "string"
+                    ? JSON.parse(parent.geometry)
+                    : parent.geometry
+                  : null,
+              }
+            : null,
+          subFeatures: subFeatures.map((sf: any) => ({
+            ...sf,
+            geometry: sf.geometry
+              ? typeof sf.geometry === "string"
+                ? JSON.parse(sf.geometry)
+                : sf.geometry
+              : null,
+          })),
+        })
       } catch (error) {
+        console.error("[Features] Error fetching feature:", error)
         return reply.code(500).send({ error: "Failed to fetch feature" })
       }
     }
@@ -55,15 +208,37 @@ export async function featuresRoutes(fastify: FastifyInstance) {
         const { name, projectId, geometry, details, parentId } =
           request.body as any
 
+        // Create feature without geometry first (since Prisma can't write to Unsupported type)
         const feature = await fastify.prisma.feature.create({
           data: {
             name,
             projectId,
-            geometry: geometry || null,
             details: details || {},
             parentId: parentId || null,
           },
         })
+
+        // Update geometry using raw SQL if provided
+        if (geometry) {
+          try {
+            // Convert GeoJSON to PostGIS WKT format
+            // ST_GeomFromGeoJSON accepts GeoJSON and stores as WKT internally
+            const geomJson = JSON.stringify(geometry)
+            await fastify.prisma.$executeRaw`
+              UPDATE "Feature"
+              SET geometry = ST_GeomFromGeoJSON(${geomJson}::jsonb)
+              WHERE id = ${feature.id}
+            `
+            console.log(
+              `[Features] Geometry saved (as WKT) for feature: ${feature.id}`
+            )
+          } catch (geomErr) {
+            console.warn(
+              `[Features] Failed to save geometry for ${feature.id}:`,
+              geomErr
+            )
+          }
+        }
 
         return reply.code(201).send(feature)
       } catch (error) {
@@ -179,12 +354,11 @@ export async function featuresRoutes(fastify: FastifyInstance) {
               const featureDetails = {
                 ...feature.properties,
                 ...(detailsStr && { uploadDetails: detailsStr }),
-                // Store geometry in details since Unsupported type can't be written through Prisma
-                geometry: feature.geometry,
               }
 
               console.log(`  → Creating feature: ${featureName}`)
 
+              // First create the feature without geometry
               const saved = await fastify.prisma.feature.create({
                 data: {
                   name: featureName,
@@ -195,6 +369,30 @@ export async function featuresRoutes(fastify: FastifyInstance) {
               })
 
               console.log(`    ✓ Saved as ID: ${saved.id}`)
+
+              // Now update the geometry using raw SQL if geometry exists
+              if (feature.geometry) {
+                try {
+                  // Convert GeoJSON to PostGIS WKT format
+                  // ST_GeomFromGeoJSON accepts GeoJSON and stores as WKT internally
+                  const geomJson = JSON.stringify(feature.geometry)
+                  await fastify.prisma.$executeRaw`
+                    UPDATE "Feature"
+                    SET geometry = ST_GeomFromGeoJSON(${geomJson}::jsonb)
+                    WHERE id = ${saved.id}
+                  `
+                  console.log(
+                    `    ✓ Geometry saved (as WKT) for feature: ${saved.id}`
+                  )
+                } catch (geomErr) {
+                  console.warn(
+                    `    ⚠ Failed to save geometry for ${saved.id}:`,
+                    geomErr
+                  )
+                  // Continue even if geometry fails
+                }
+              }
+
               savedFeatures.push(saved)
             } catch (featureErr) {
               console.error(`    ✗ Error creating feature:`, featureErr)
@@ -235,15 +433,37 @@ export async function featuresRoutes(fastify: FastifyInstance) {
       try {
         const { name, geometry, details, parentId } = request.body as any
 
+        // Update non-geometry fields with Prisma
+        const updateData: any = {}
+        if (name !== undefined) updateData.name = name
+        if (details !== undefined) updateData.details = details
+        if (parentId !== undefined) updateData.parentId = parentId
+
         const feature = await fastify.prisma.feature.update({
           where: { id: request.params.id },
-          data: {
-            name,
-            geometry: geometry || undefined,
-            details: details || undefined,
-            parentId: parentId || undefined,
-          },
+          data: updateData,
         })
+
+        // Update geometry separately using raw SQL if provided
+        if (geometry !== undefined) {
+          try {
+            const geomJson = JSON.stringify(geometry)
+            await fastify.prisma.$executeRaw`
+              UPDATE "Feature"
+              SET geometry = ST_GeomFromGeoJSON(${geomJson}::jsonb)
+              WHERE id = ${request.params.id}
+            `
+            console.log(
+              `[Features] Geometry updated (as WKT) for feature: ${request.params.id}`
+            )
+          } catch (geomErr) {
+            console.warn(
+              `[Features] Failed to update geometry for ${request.params.id}:`,
+              geomErr
+            )
+            // Continue - the feature was updated even if geometry failed
+          }
+        }
 
         return reply.send(feature)
       } catch (error) {

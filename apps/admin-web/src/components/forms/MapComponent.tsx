@@ -41,9 +41,12 @@ export default function MapComponent({
 
     const map = L.map(containerRef.current).setView([lat, lng], 13)
 
-    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-      maxZoom: 19,
-    } as any).addTo(map)
+    L.tileLayer(
+      "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}.png",
+      {
+        maxZoom: 30,
+      } as any
+    ).addTo(map)
 
     // Add marker
     const marker = L.marker([lat, lng], { icon: defaultIcon })

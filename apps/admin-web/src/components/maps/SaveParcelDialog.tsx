@@ -11,13 +11,6 @@ import { Button } from "@workspace/ui/components/button"
 import { Input } from "@workspace/ui/components/input"
 import { Label } from "@workspace/ui/components/label"
 import { Textarea } from "@workspace/ui/components/textarea"
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@workspace/ui/components/select"
 import { Loader2 } from "lucide-react"
 
 interface SaveParcelDialogProps {
@@ -191,10 +184,10 @@ export function SaveParcelDialog({
           {step === "parcel" && (
             <>
               <div className="space-y-2">
-                <Label htmlFor="parcelName">Parcel Name (Optional)</Label>
+                <Label htmlFor="parcelName">Parcel Name (Recommended)</Label>
                 <Input
                   id="parcelName"
-                  placeholder="East Field"
+                  placeholder="Parcel number or easily Identifiable name"
                   value={formData.parcelName}
                   onChange={(e) =>
                     handleInputChange("parcelName", e.target.value)

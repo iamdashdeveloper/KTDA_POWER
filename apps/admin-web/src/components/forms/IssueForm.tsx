@@ -4,10 +4,7 @@ import { zodResolver } from "@hookform/resolvers/zod"
 import { Button } from "@workspace/ui/components/button"
 import { Input } from "@workspace/ui/components/input"
 import { Card } from "@workspace/ui/components/card"
-import {
-  IssueFormSchema,
-  type IssueFormData,
-} from "@workspace/database/validations"
+import { IssueFormSchema, type IssueFormData } from "@workspace/ui/validations"
 import { JsonMetadataEditor } from "./JsonMetadataEditor"
 import { GeometryPicker } from "./GeometryPicker"
 import { handleFormError, handleFormSuccess } from "@/lib/errorHandler"

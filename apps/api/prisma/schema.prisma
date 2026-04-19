@@ -108,7 +108,7 @@ model Feature {
   createdAt   DateTime                 @default(now())
   images      String[]                 @default([])
   parentId    String?
-  parent      Feature?                 @relation("FeatureHierarchy", fields: [parentId], references: [id])
+  parent      Feature?                 @relation("FeatureHierarchy", fields: [parentId], references: [id], onDelete: Cascade)
   subFeatures Feature[]                @relation("FeatureHierarchy")
   issues      Issue[]
   schedules   MaintenanceSchedule[]
@@ -336,6 +336,7 @@ model Owner {
   metadata   Json        @default("{}")
   createdAt  DateTime    @default(now())
   updatedAt  DateTime    @updatedAt
+  complaints Complaint[]
   feedbacks  Feedback[]
   parcels    Parcel[]
 }
@@ -351,24 +352,29 @@ model Parcel {
   metadata    Json                     @default("{}")
   createdAt   DateTime                 @default(now())
   updatedAt   DateTime                 @updatedAt
+  complaints  Complaint[]
   feedbacks   Feedback[]
   owner       Owner                    @relation(fields: [ownerId], references: [id], onDelete: Cascade)
 }
 
 model Complaint {
   id                 String                   @id @default(cuid())
+  parcelId           String
+  ownerId            String
   phoneNumber        String
   complaintType      String
   description        String
   plotNumber         String?
   name               String
-  projectId          String
+  projectId          String?
   severity           String                   @default("medium")
   status             String                   @default("open")
   metadata           Json                     @default("{}")
   createdAt          DateTime                 @default(now())
   updatedAt          DateTime                 @updatedAt
-  project            Project                  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  owner              Owner                    @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  parcel             Parcel                   @relation(fields: [parcelId], references: [id], onDelete: Cascade)
+  project            Project?                 @relation(fields: [projectId], references: [id], onDelete: SetNull)
   feedbacks          Feedback[]
 }
 

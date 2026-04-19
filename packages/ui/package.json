@@ -12,6 +12,7 @@
     "@fontsource-variable/geist-mono": "^5.2.7",
     "@fontsource-variable/inter": "^5.2.8",
     "@radix-ui/react-collapsible": "^1.1.12",
+    "@radix-ui/react-context-menu": "^2.2.16",
     "@syncfusion/react-base": "^33.1.44",
     "@syncfusion/react-charts": "^33.1.44",
     "class-variance-authority": "^0.7.1",

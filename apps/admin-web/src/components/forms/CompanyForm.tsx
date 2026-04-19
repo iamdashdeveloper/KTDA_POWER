@@ -8,7 +8,7 @@ import { Card } from "@workspace/ui/components/card"
 import {
   CompanyFormSchema,
   type CompanyFormData,
-} from "@workspace/database/validations"
+} from "@workspace/ui/validations"
 import { JsonMetadataEditor } from "./JsonMetadataEditor"
 import { GeometryPicker } from "./GeometryPicker"
 import { ImageUploader } from "../ImageUploader"
