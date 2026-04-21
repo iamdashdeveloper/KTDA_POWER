@@ -1,0 +1,23 @@
+{
+  "projects": [
+    {
+      "id": "gura-hydro-001",
+      "name": "Gura Hydro Project",
+      "folder": "Gura_Hydro_Project",
+      "description": "Gura hydroelectric power station project with infrastructure data",
+      "files": [
+        "canal.geojson",
+        "forebay.geojson",
+        "penstock.geojson",
+        "power-station.geojson"
+      ]
+    },
+    {
+      "id": "imenti-project-001",
+      "name": "Imenti Project",
+      "folder": "imenti",
+      "description": "Imenti region hydroelectric development project",
+      "files": []
+    }
+  ]
+}

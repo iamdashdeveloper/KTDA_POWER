@@ -1,6 +1,7 @@
 import Fastify from "fastify"
 import cors from "@fastify/cors"
 import jwt from "@fastify/jwt"
+import cookie from "@fastify/cookie"
 import staticPlugin from "@fastify/static"
 import multipart from "@fastify/multipart"
 import { env } from "./config/env.js"
@@ -84,6 +85,8 @@ export async function createApp() {
   await fastify.register(jwt, {
     secret: env.JWT_SECRET,
   })
+
+  await fastify.register(cookie)
 
   await fastify.register(multipart, {
     limits: {

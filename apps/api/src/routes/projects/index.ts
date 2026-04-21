@@ -29,15 +29,37 @@ export async function projectsRoutes(fastify: FastifyInstance) {
   // GET /projects - List all projects
   fastify.get("/projects", async (request, reply) => {
     try {
-      const projects = await fastify.prisma.project.findMany({
-        select: {
-          id: true,
-          name: true,
-          description: true,
-          status: true,
-          images: true,
-        },
-      })
+      const projects = await fastify.prisma.$queryRaw<
+        Array<{
+          id: string
+          name: string
+          description: string | null
+          status: string | null
+          images: string[]
+          companyId: string
+          metadata: Record<string, unknown>
+          location: { latitude: number; longitude: number } | null
+        }>
+      >`
+        SELECT
+          p.id,
+          p.name,
+          p.description,
+          p.status,
+          p.images,
+          p."companyId",
+          p.metadata,
+          CASE
+            WHEN p.location IS NOT NULL
+            THEN json_build_object(
+              'latitude', ST_Y(p.location::geometry),
+              'longitude', ST_X(p.location::geometry)
+            )
+            ELSE NULL
+          END AS location
+        FROM "Project" p
+        ORDER BY p."createdAt" DESC
+      `
 
       return projects
     } catch (error) {
@@ -70,7 +92,32 @@ export async function projectsRoutes(fastify: FastifyInstance) {
           return reply.status(404).send({ error: "Project not found" })
         }
 
-        return project
+        const locationRows = await fastify.prisma.$queryRaw<
+          Array<{ latitude: number | null; longitude: number | null }>
+        >`
+          SELECT
+            CASE WHEN p.location IS NOT NULL THEN ST_Y(p.location::geometry) ELSE NULL END AS latitude,
+            CASE WHEN p.location IS NOT NULL THEN ST_X(p.location::geometry) ELSE NULL END AS longitude
+          FROM "Project" p
+          WHERE p.id = ${request.params.id}
+          LIMIT 1
+        `
+
+        const locationRow = locationRows[0]
+        const location =
+          locationRow &&
+          locationRow.latitude !== null &&
+          locationRow.longitude !== null
+            ? {
+                latitude: Number(locationRow.latitude),
+                longitude: Number(locationRow.longitude),
+              }
+            : null
+
+        return {
+          ...project,
+          location,
+        }
       } catch (error) {
         reply.status(500).send({
           error: "Failed to fetch project",
