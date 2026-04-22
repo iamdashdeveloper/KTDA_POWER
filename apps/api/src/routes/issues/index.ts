@@ -88,6 +88,52 @@ export async function issuesRoutes(fastify: FastifyInstance) {
     }
   )
 
+  // GET /projects/:projectId/issues/map - Get issues for map rendering
+  fastify.get<{ Params: { projectId: string } }>(
+    "/projects/:projectId/issues/map",
+    async (request, reply) => {
+      try {
+        const { projectId } = request.params
+
+        const issues = (await fastify.prisma.$queryRaw`
+          SELECT 
+            id,
+            "projectId",
+            "featureId",
+            title,
+            status,
+            priority,
+            images,
+            "createdAt",
+            description,
+            CASE 
+              WHEN location IS NOT NULL THEN ST_AsGeoJSON(location)::jsonb
+              ELSE NULL
+            END as location,
+            metadata
+          FROM "Issue"
+          WHERE "projectId" = ${projectId}
+          ORDER BY "createdAt" DESC
+        `) as any[]
+
+        return reply.send(
+          issues.map((issue) => ({
+            ...issue,
+            location:
+              issue.location && typeof issue.location === "string"
+                ? JSON.parse(issue.location)
+                : issue.location,
+          }))
+        )
+      } catch (error) {
+        reply.status(500).send({
+          error: "Failed to fetch project issues",
+          message: error instanceof Error ? error.message : "Unknown error",
+        })
+      }
+    }
+  )
+
   // GET /issues/:id - Get issue by ID
   fastify.get<{ Params: { id: string } }>(
     "/issues/:id",
@@ -337,6 +383,28 @@ export async function issuesRoutes(fastify: FastifyInstance) {
       const { id } = request.params
       const { content, images = [], statusChange } = request.body
 
+      try {
+        await request.jwtVerify()
+      } catch {
+        return reply.status(401).send({ error: "Unauthorized" })
+      }
+
+      const userId = String(
+        (request.user as any)?.sub || (request.user as any)?.id || ""
+      )
+
+      if (!userId) {
+        return reply.status(401).send({ error: "Unauthorized" })
+      }
+
+      const user = await fastify.prisma.user.findUnique({
+        where: { id: userId },
+      })
+
+      if (!user) {
+        return reply.status(401).send({ error: "User not found" })
+      }
+
       // Verify issue exists
       const issue = await fastify.prisma.issue.findUnique({
         where: { id },
@@ -358,7 +426,7 @@ export async function issuesRoutes(fastify: FastifyInstance) {
       const update = await fastify.prisma.issueUpdate.create({
         data: {
           issueId: id,
-          userId: "system", // TODO: Get from request context (authenticated user)
+          userId,
           content: content.trim(),
           images,
           statusChange: statusChange || null,

@@ -27,7 +27,7 @@ export default fp(async (fastify) => {
     try {
       await request.jwtVerify()
       // @ts-ignore
-      request.userId = BigInt(request.user.sub || request.user.id)
+      request.userId = String(request.user.sub || request.user.id)
     } catch (err) {
       // Request doesn't have a valid token, continue
     }

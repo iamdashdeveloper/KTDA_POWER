@@ -20,7 +20,7 @@ declare module "fastify" {
   }
 
   interface FastifyRequest {
-    userId?: bigint
+    userId?: string
   }
 }
 

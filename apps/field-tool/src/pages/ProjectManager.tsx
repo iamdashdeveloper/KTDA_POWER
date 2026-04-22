@@ -169,7 +169,7 @@ export default function ProjectManager() {
                       <span className="text-muted-foreground">
                         {typeof project.location === "string"
                           ? project.location
-                          : `${project.location.latitude.toFixed(6)}, ${project.location.longitude.toFixed(6)}`}
+                          : `${project.location.latitude.toFixed(5)}, ${project.location.longitude.toFixed(5)}`}
                       </span>
                     </div>
                   )}

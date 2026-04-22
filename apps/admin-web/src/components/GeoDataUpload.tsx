@@ -1,6 +1,13 @@
-import { useState, useRef } from "react"
+import { useEffect, useRef, useState } from "react"
 import { Button } from "@workspace/ui/components/button"
 import { Textarea } from "@workspace/ui/components/textarea"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@workspace/ui/components/select"
 import { toast } from "sonner"
 import { Upload, X, FileJson, MapPin } from "lucide-react"
 import { apiClient } from "../lib/api"
@@ -8,6 +15,11 @@ import { apiClient } from "../lib/api"
 interface GeoDataUploadProps {
   onUploadSuccess?: (count: number) => void
   className?: string
+}
+
+interface ProjectOption {
+  id: string
+  name: string
 }
 
 export function GeoDataUpload({
@@ -18,6 +30,9 @@ export function GeoDataUpload({
   const [uploadLoading, setUploadLoading] = useState(false)
   const [dragActive, setDragActive] = useState(false)
   const [details, setDetails] = useState("")
+  const [projects, setProjects] = useState<ProjectOption[]>([])
+  const [projectsLoading, setProjectsLoading] = useState(false)
+  const [selectedProjectId, setSelectedProjectId] = useState("")
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   const acceptedFileTypes = [
@@ -27,6 +42,23 @@ export function GeoDataUpload({
     "application/geo+json",
     "application/x-kmz",
   ]
+
+  useEffect(() => {
+    const fetchProjects = async () => {
+      try {
+        setProjectsLoading(true)
+        const response = await apiClient.get<ProjectOption[]>("/projects")
+        setProjects(response.data)
+      } catch (error) {
+        console.error("Error fetching projects:", error)
+        toast.error("Failed to load projects")
+      } finally {
+        setProjectsLoading(false)
+      }
+    }
+
+    fetchProjects()
+  }, [])
 
   const isValidFile = (file: File) => {
     return (
@@ -92,6 +124,9 @@ export function GeoDataUpload({
       setUploadLoading(true)
       const formData = new FormData()
       formData.append("file", selectedFile)
+      if (selectedProjectId) {
+        formData.append("projectId", selectedProjectId)
+      }
       if (details) {
         formData.append("details", details)
       }
@@ -126,6 +161,7 @@ export function GeoDataUpload({
 
         setSelectedFile(null)
         setDetails("")
+        setSelectedProjectId("")
         if (fileInputRef.current) {
           fileInputRef.current.value = ""
         }
@@ -244,6 +280,38 @@ export function GeoDataUpload({
           <div className="space-y-4 rounded-lg border bg-card p-6">
             <div>
               <label className="mb-2 block text-sm font-medium">
+                Project (Optional)
+              </label>
+              <Select
+                value={selectedProjectId || "none"}
+                onValueChange={(value) =>
+                  setSelectedProjectId(value === "none" ? "" : value)
+                }
+                disabled={projectsLoading}
+              >
+                <SelectTrigger>
+                  <SelectValue
+                    placeholder={
+                      projectsLoading ? "Loading projects..." : "Select project"
+                    }
+                  />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">No project</SelectItem>
+                  {projects.map((project) => (
+                    <SelectItem key={project.id} value={project.id}>
+                      {project.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="mt-1 text-xs text-muted-foreground">
+                Assign uploaded features to a project, or leave unassigned
+              </p>
+            </div>
+
+            <div>
+              <label className="mb-2 block text-sm font-medium">
                 Details (Optional)
               </label>
               <Textarea
@@ -266,6 +334,7 @@ export function GeoDataUpload({
             onClick={() => {
               setSelectedFile(null)
               setDetails("")
+              setSelectedProjectId("")
               if (fileInputRef.current) {
                 fileInputRef.current.value = ""
               }

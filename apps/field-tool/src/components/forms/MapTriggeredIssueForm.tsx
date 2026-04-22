@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { z } from "zod"
@@ -37,6 +37,7 @@ export function MapTriggeredIssueForm({
   const [isUploading, setIsUploading] = useState(false)
   const [isDragging, setIsDragging] = useState(false)
   const [geoLoading, setGeoLoading] = useState(false)
+  const cameraInputRef = useRef<HTMLInputElement | null>(null)
   const [currentLocation, setCurrentLocation] = useState<{
     latitude: number
     longitude: number
@@ -145,6 +146,19 @@ export function MapTriggeredIssueForm({
 
   const removeImage = (index: number) => {
     setUploadedImages((prev) => prev.filter((_, i) => i !== index))
+  }
+
+  const handleTakePhotos = () => {
+    if (uploadedImages.length >= 5 || isUploading || submitting) {
+      return
+    }
+
+    cameraInputRef.current?.click()
+  }
+
+  const handleCameraChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    handleFileSelect(event.target.files)
+    event.currentTarget.value = ""
   }
 
   const handleUseCurrentLocation = () => {
@@ -338,9 +352,36 @@ export function MapTriggeredIssueForm({
 
             {/* Images */}
             <div>
-              <label className="mb-2 block text-sm font-medium">
-                Attach Photos ({uploadedImages.length}/5)
-              </label>
+              <div className="mb-2 flex items-center justify-between gap-3">
+                <label className="block text-sm font-medium">
+                  Attach Photos ({uploadedImages.length}/5)
+                </label>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={handleTakePhotos}
+                  disabled={
+                    uploadedImages.length >= 5 || isUploading || submitting
+                  }
+                >
+                  Take Photos
+                </Button>
+              </div>
+
+              <input
+                ref={cameraInputRef}
+                type="file"
+                accept="image/*"
+                capture="environment"
+                multiple
+                onChange={handleCameraChange}
+                className="hidden"
+                disabled={
+                  uploadedImages.length >= 5 || isUploading || submitting
+                }
+              />
+
               <div
                 onDragOver={handleDragOver}
                 onDragLeave={handleDragLeave}

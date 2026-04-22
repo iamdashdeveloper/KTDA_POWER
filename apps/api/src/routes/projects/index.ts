@@ -19,49 +19,109 @@ interface UpdateProjectBody {
   location?: {
     latitude: number
     longitude: number
-  }
+  } | null
   metadata?: Record<string, unknown>
   status?: string
   images?: string[]
 }
 
+interface ProjectRow {
+  id: string
+  name: string
+  description: string | null
+  metadata: Record<string, unknown> | null
+  status: string | null
+  images: string[]
+  companyId: string
+  latitude: number | null
+  longitude: number | null
+}
+
+function mapProjectRow(row: ProjectRow) {
+  return {
+    id: row.id,
+    name: row.name,
+    description: row.description,
+    metadata: row.metadata,
+    status: row.status,
+    images: row.images,
+    companyId: row.companyId,
+    location:
+      row.latitude !== null && row.longitude !== null
+        ? {
+            latitude: Number(row.latitude),
+            longitude: Number(row.longitude),
+          }
+        : null,
+  }
+}
+
+function isValidLocation(
+  location:
+    | {
+        latitude: number
+        longitude: number
+      }
+    | null
+    | undefined
+) {
+  if (!location) {
+    return false
+  }
+
+  const latitude = Number(location.latitude)
+  const longitude = Number(location.longitude)
+
+  return (
+    Number.isFinite(latitude) &&
+    Number.isFinite(longitude) &&
+    latitude >= -90 &&
+    latitude <= 90 &&
+    longitude >= -180 &&
+    longitude <= 180
+  )
+}
+
 export async function projectsRoutes(fastify: FastifyInstance) {
+  const getProjectById = async (id: string) => {
+    const rows = (await fastify.prisma.$queryRaw`
+      SELECT
+        id,
+        name,
+        description,
+        metadata,
+        status,
+        images,
+        "companyId",
+        CASE WHEN location IS NOT NULL THEN ST_Y(location) ELSE NULL END AS latitude,
+        CASE WHEN location IS NOT NULL THEN ST_X(location) ELSE NULL END AS longitude
+      FROM "Project"
+      WHERE id = ${id}
+      LIMIT 1
+    `) as ProjectRow[]
+
+    return rows[0] ?? null
+  }
+
   // GET /projects - List all projects
   fastify.get("/projects", async (request, reply) => {
     try {
-      const projects = await fastify.prisma.$queryRaw<
-        Array<{
-          id: string
-          name: string
-          description: string | null
-          status: string | null
-          images: string[]
-          companyId: string
-          metadata: Record<string, unknown>
-          location: { latitude: number; longitude: number } | null
-        }>
-      >`
+      const projects = (await fastify.prisma.$queryRaw`
         SELECT
-          p.id,
-          p.name,
-          p.description,
-          p.status,
-          p.images,
-          p."companyId",
-          p.metadata,
-          CASE
-            WHEN p.location IS NOT NULL
-            THEN json_build_object(
-              'latitude', ST_Y(p.location::geometry),
-              'longitude', ST_X(p.location::geometry)
-            )
-            ELSE NULL
-          END AS location
-        FROM "Project" p
-        ORDER BY p."createdAt" DESC
-      `
+          id,
+          name,
+          description,
+          metadata,
+          status,
+          images,
+          "companyId",
+          CASE WHEN location IS NOT NULL THEN ST_Y(location) ELSE NULL END AS latitude,
+          CASE WHEN location IS NOT NULL THEN ST_X(location) ELSE NULL END AS longitude
+        FROM "Project"
+        ORDER BY "createdAt" DESC
+      `) as ProjectRow[]
 
-      return projects
+      return projects.map(mapProjectRow)
     } catch (error) {
       reply.status(500).send({
         error: "Failed to fetch projects",
@@ -75,49 +135,13 @@ export async function projectsRoutes(fastify: FastifyInstance) {
     "/projects/:id",
     async (request, reply) => {
       try {
-        const project = await fastify.prisma.project.findUnique({
-          where: { id: request.params.id },
-          select: {
-            id: true,
-            name: true,
-            description: true,
-            metadata: true,
-            status: true,
-            images: true,
-            companyId: true,
-          },
-        })
+        const row = await getProjectById(request.params.id)
 
-        if (!project) {
+        if (!row) {
           return reply.status(404).send({ error: "Project not found" })
         }
 
-        const locationRows = await fastify.prisma.$queryRaw<
-          Array<{ latitude: number | null; longitude: number | null }>
-        >`
-          SELECT
-            CASE WHEN p.location IS NOT NULL THEN ST_Y(p.location::geometry) ELSE NULL END AS latitude,
-            CASE WHEN p.location IS NOT NULL THEN ST_X(p.location::geometry) ELSE NULL END AS longitude
-          FROM "Project" p
-          WHERE p.id = ${request.params.id}
-          LIMIT 1
-        `
-
-        const locationRow = locationRows[0]
-        const location =
-          locationRow &&
-          locationRow.latitude !== null &&
-          locationRow.longitude !== null
-            ? {
-                latitude: Number(locationRow.latitude),
-                longitude: Number(locationRow.longitude),
-              }
-            : null
-
-        return {
-          ...project,
-          location,
-        }
+        return mapProjectRow(row)
       } catch (error) {
         reply.status(500).send({
           error: "Failed to fetch project",
@@ -132,8 +156,15 @@ export async function projectsRoutes(fastify: FastifyInstance) {
     "/projects",
     async (request, reply) => {
       try {
-        const { name, description, companyId, metadata, status, images } =
-          request.body
+        const {
+          name,
+          description,
+          companyId,
+          metadata,
+          status,
+          images,
+          location,
+        } = request.body
 
         if (!name || name.trim().length === 0) {
           return reply.status(400).send({
@@ -144,6 +175,12 @@ export async function projectsRoutes(fastify: FastifyInstance) {
         if (!companyId) {
           return reply.status(400).send({
             error: "Company ID is required",
+          })
+        }
+
+        if (location !== undefined && !isValidLocation(location)) {
+          return reply.status(400).send({
+            error: "Invalid project location",
           })
         }
 
@@ -160,7 +197,22 @@ export async function projectsRoutes(fastify: FastifyInstance) {
           data: projectData,
         })
 
-        return reply.status(201).send(project)
+        if (location && isValidLocation(location)) {
+          await fastify.prisma.$executeRaw`
+            UPDATE "Project"
+            SET location = ST_SetSRID(ST_Point(${location.longitude}, ${location.latitude}), 4326)
+            WHERE id = ${project.id}
+          `
+        }
+
+        const createdProject = await getProjectById(project.id)
+        if (!createdProject) {
+          return reply.status(500).send({
+            error: "Failed to fetch created project",
+          })
+        }
+
+        return reply.status(201).send(mapProjectRow(createdProject))
       } catch (error) {
         reply.status(500).send({
           error: "Failed to create project",
@@ -178,22 +230,51 @@ export async function projectsRoutes(fastify: FastifyInstance) {
         const { name, description, metadata, status, images, location } =
           request.body
 
-        const updateData: any = {
-          ...(name && { name }),
-          ...(description !== undefined && { description }),
-          ...(metadata && { metadata }),
-          ...(status && { status }),
-          ...(images && { images }),
-          // Note: PostGIS geometry fields (location) cannot be updated directly through Prisma
-          // They require raw SQL queries. Location updates should be handled separately if needed.
+        if (
+          location !== undefined &&
+          location !== null &&
+          !isValidLocation(location)
+        ) {
+          return reply.status(400).send({
+            error: "Invalid project location",
+          })
         }
 
-        const project = await fastify.prisma.project.update({
+        const updateData: any = {
+          ...(name !== undefined && { name }),
+          ...(description !== undefined && { description }),
+          ...(metadata !== undefined && { metadata }),
+          ...(status !== undefined && { status }),
+          ...(images !== undefined && { images }),
+        }
+
+        await fastify.prisma.project.update({
           where: { id: request.params.id },
           data: updateData,
         })
 
-        return reply.send(project)
+        if (location !== undefined) {
+          if (location === null) {
+            await fastify.prisma.$executeRaw`
+              UPDATE "Project"
+              SET location = NULL
+              WHERE id = ${request.params.id}
+            `
+          } else {
+            await fastify.prisma.$executeRaw`
+              UPDATE "Project"
+              SET location = ST_SetSRID(ST_Point(${location.longitude}, ${location.latitude}), 4326)
+              WHERE id = ${request.params.id}
+            `
+          }
+        }
+
+        const updatedProject = await getProjectById(request.params.id)
+        if (!updatedProject) {
+          return reply.status(404).send({ error: "Project not found" })
+        }
+
+        return reply.send(mapProjectRow(updatedProject))
       } catch (error) {
         reply.status(500).send({
           error: "Failed to update project",
@@ -211,22 +292,51 @@ export async function projectsRoutes(fastify: FastifyInstance) {
         const { name, description, metadata, status, images, location } =
           request.body
 
-        const updateData: any = {
-          ...(name && { name }),
-          ...(description !== undefined && { description }),
-          ...(metadata && { metadata }),
-          ...(status && { status }),
-          ...(images && { images }),
-          // Note: PostGIS geometry fields (location) cannot be updated directly through Prisma
-          // They require raw SQL queries. Location updates should be handled separately if needed.
+        if (
+          location !== undefined &&
+          location !== null &&
+          !isValidLocation(location)
+        ) {
+          return reply.status(400).send({
+            error: "Invalid project location",
+          })
         }
 
-        const project = await fastify.prisma.project.update({
+        const updateData: any = {
+          ...(name !== undefined && { name }),
+          ...(description !== undefined && { description }),
+          ...(metadata !== undefined && { metadata }),
+          ...(status !== undefined && { status }),
+          ...(images !== undefined && { images }),
+        }
+
+        await fastify.prisma.project.update({
           where: { id: request.params.id },
           data: updateData,
         })
 
-        return reply.send(project)
+        if (location !== undefined) {
+          if (location === null) {
+            await fastify.prisma.$executeRaw`
+              UPDATE "Project"
+              SET location = NULL
+              WHERE id = ${request.params.id}
+            `
+          } else {
+            await fastify.prisma.$executeRaw`
+              UPDATE "Project"
+              SET location = ST_SetSRID(ST_Point(${location.longitude}, ${location.latitude}), 4326)
+              WHERE id = ${request.params.id}
+            `
+          }
+        }
+
+        const updatedProject = await getProjectById(request.params.id)
+        if (!updatedProject) {
+          return reply.status(404).send({ error: "Project not found" })
+        }
+
+        return reply.send(mapProjectRow(updatedProject))
       } catch (error) {
         reply.status(500).send({
           error: "Failed to update project",

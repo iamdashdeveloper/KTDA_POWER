@@ -94,6 +94,56 @@ export async function featuresRoutes(fastify: FastifyInstance) {
     }
   )
 
+  // Get all features for a specific project
+  fastify.get<{ Params: { projectId: string } }>(
+    "/projects/:projectId/features",
+    async (
+      request: FastifyRequest<{ Params: { projectId: string } }>,
+      reply: FastifyReply
+    ) => {
+      try {
+        const { projectId } = request.params
+
+        const features = (await fastify.prisma.$queryRaw`
+          SELECT 
+            f.id,
+            f."projectId",
+            f.name,
+            CASE 
+              WHEN f.geometry IS NOT NULL THEN ST_AsGeoJSON(f.geometry)::jsonb
+              ELSE NULL
+            END as geometry,
+            f.details,
+            f."createdAt",
+            f.images,
+            f."parentId",
+            p.name as "parentName",
+            COALESCE(p.name, f.name) as "groupName"
+          FROM "Feature" f
+          LEFT JOIN "Feature" p ON p.id = f."parentId"
+          WHERE f."projectId" = ${projectId}
+            AND f.geometry IS NOT NULL
+          ORDER BY f."createdAt" DESC
+        `) as any[]
+
+        return reply.send(
+          features.map((feature) => ({
+            ...feature,
+            geometry:
+              feature.geometry && typeof feature.geometry === "string"
+                ? JSON.parse(feature.geometry)
+                : feature.geometry,
+          }))
+        )
+      } catch (error) {
+        console.error("[Features] Error fetching project features:", error)
+        return reply
+          .code(500)
+          .send({ error: "Failed to fetch project features" })
+      }
+    }
+  )
+
   // Get feature by ID
   fastify.get<{ Params: { id: string } }>(
     "/features/:id",
@@ -280,28 +330,28 @@ export async function featuresRoutes(fastify: FastifyInstance) {
         const preview = fileBuffer.toString("utf-8").substring(0, 300)
         console.log(`[Upload] File content preview:\n${preview}`)
 
-        // Now get the remaining form fields
+        // Read multipart form fields from the same parsed request
         let projectId: string = ""
         let detailsStr: string = ""
 
-        try {
-          const parts = request.parts()
-          for await (const part of parts) {
-            if (part.type === "field") {
-              const fieldValue = part.value as string
-              console.log(`[Upload] Field: ${part.fieldname} = ${fieldValue}`)
-              if (part.fieldname === "projectId") {
-                projectId = fieldValue
-              } else if (part.fieldname === "details") {
-                detailsStr = fieldValue
-              }
-            }
-          }
-        } catch (err) {
-          console.log(
-            "[Upload] Note: No form fields found or error reading them, continuing..."
-          )
+        const formFields = file.fields as Record<
+          string,
+          { value?: unknown } | undefined
+        >
+        const rawProjectId = formFields.projectId?.value
+        const rawDetails = formFields.details?.value
+
+        if (typeof rawProjectId === "string") {
+          projectId = rawProjectId.trim()
         }
+
+        if (typeof rawDetails === "string") {
+          detailsStr = rawDetails
+        }
+
+        console.log(
+          `[Upload] Parsed fields: projectId=${projectId || "<none>"}, detailsProvided=${detailsStr.length > 0}`
+        )
 
         // Determine file type and parse
         const fileType = path.extname(filename).toLowerCase()

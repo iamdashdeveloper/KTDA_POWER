@@ -6,13 +6,13 @@ export interface Project {
   name: string
   companyId: string
   description?: string
-  metadata?: Record<string, unknown>
   location?:
-    | string
     | {
         latitude: number
         longitude: number
       }
+    | string
+    | null
 }
 
 export interface ProjectStoreState {
