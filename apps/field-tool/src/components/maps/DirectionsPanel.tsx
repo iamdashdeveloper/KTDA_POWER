@@ -45,6 +45,9 @@ function ManeuverIcon({ type, modifier }: { type: string; modifier?: string }) {
   if (m === "right" || m === "slight right" || m === "sharp right") {
     return <CornerUpRight className="h-5 w-5 text-primary" />
   }
+  if (t === "direct") {
+    return <Navigation className="h-5 w-5 text-primary rotate-45" />
+  }
   return <Navigation className="h-5 w-5 text-muted-foreground" />
 }
 
@@ -62,6 +65,7 @@ interface DirectionsPanelProps {
   totalDistance: number
   totalDuration: number
   currentStepIndex: number
+  navigationMode?: "route" | "direct"
 }
 
 export function DirectionsPanel({
@@ -71,6 +75,7 @@ export function DirectionsPanel({
   totalDistance,
   totalDuration,
   currentStepIndex,
+  navigationMode = "route",
 }: DirectionsPanelProps) {
   const [height, setHeight] = useState(DEFAULT_HEIGHT)
   const [isDragging, setIsDragging] = useState(false)
@@ -182,6 +187,11 @@ export function DirectionsPanel({
             <span className="flex items-center gap-1 text-primary">
               Step {currentStepIndex + 1} of {steps.length}
             </span>
+            {navigationMode === "direct" && (
+              <span className="flex items-center gap-1 rounded bg-primary/20 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-primary">
+                Direct Mode
+              </span>
+            )}
           </div>
         </div>
 

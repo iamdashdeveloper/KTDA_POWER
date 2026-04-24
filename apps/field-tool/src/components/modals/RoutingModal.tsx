@@ -137,12 +137,21 @@ export function RoutingModal({
         const val = parseFloat(chainageValue)
         if (!isNaN(val)) {
           try {
-            const line = selectedDestination.geometry
-            const sliced = turf.along(line, val / 1000, { units: "kilometers" })
-            finalDestinationCoord = sliced.geometry.coordinates as [
-              number,
-              number,
-            ]
+            const originalGeom = selectedDestination.geometry
+            let lineForAlong: any = originalGeom
+            
+            // turf.along requires a LineString, so we flatten MultiLineString
+            if (originalGeom.type === "MultiLineString") {
+              lineForAlong = turf.lineString(originalGeom.coordinates.flat(1)).geometry
+            }
+
+            if (lineForAlong.type === "LineString" && lineForAlong.coordinates.length >= 2) {
+              const sliced = turf.along(lineForAlong, val / 1000, { units: "kilometers" })
+              finalDestinationCoord = sliced.geometry.coordinates as [
+                number,
+                number,
+              ]
+            }
           } catch (e) {
             console.error("Failed to calculate chainage coordinate:", e)
           }

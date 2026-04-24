@@ -59,6 +59,9 @@ export function generateInstruction(
     case "new_name":
       action = `Continue onto ${street}`
       break
+    case "direct":
+      action = maneuver.instruction || `Proceed off-road to your destination`
+      break
     default:
       action = `Proceed on ${street}`
   }
@@ -283,5 +286,11 @@ export function getFeatureColor(geometryType: string, layerId?: string, opacity:
   }
 
   return `rgba(168, 85, 247, ${opacity * 0.9})`  // purple
+}
+
+export function getBearingText(bearing: number): string {
+  const directions = ["north", "northeast", "east", "southeast", "south", "southwest", "west", "northwest"]
+  const index = Math.round(((bearing %= 360) < 0 ? bearing + 360 : bearing) / 45) % 8
+  return directions[index]
 }
 

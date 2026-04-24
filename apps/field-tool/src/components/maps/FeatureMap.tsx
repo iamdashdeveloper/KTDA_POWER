@@ -9,6 +9,7 @@ import OSM from "ol/source/OSM"
 import XYZ from "ol/source/XYZ"
 import { defaults as defaultControls } from "ol/control/defaults"
 import Point from "ol/geom/Point"
+import LineString from "ol/geom/LineString"
 import Feature from "ol/Feature"
 import Style from "ol/style/Style"
 import Fill from "ol/style/Fill"
@@ -29,7 +30,7 @@ import { createEmpty as createEmptyExtent, extend as extendExtent } from "ol/ext
 import type { Basemap, OSRMRoute, LegendGroupItem } from "./types"
 import { DEFAULT_CENTER, DEFAULT_ZOOM, PROJECT_LOCATION_ZOOM, geoJsonFormat, satelliteAttribution } from "./constants"
 import { featureStyleFunction, issueStyleFunction } from "./mapStyles"
-import { getProjectCoordinates, haversineDistance, generateInstruction, formatDistance, formatDuration, getThemeColor, setStoredLayerColor } from "./mapUtils"
+import { getProjectCoordinates, haversineDistance, generateInstruction, formatDistance, formatDuration, getThemeColor, setStoredLayerColor, getBearingText } from "./mapUtils"
 import { speak, stopSpeaking, useVoicesPreload } from "./voiceUtils"
 import { DirectionsPanel } from "./DirectionsPanel"
 import { MapToolbar } from "./MapToolbar"
@@ -90,6 +91,11 @@ export default function FeatureMap() {
   const [routeSteps, setRouteSteps] = useState<RouteStep[]>([])
   const [routeSummary, setRouteSummary] = useState<{ distance: number; duration: number }>({ distance: 0, duration: 0 })
   const [currentStepIndex, setCurrentStepIndex] = useState(0)
+
+  // Hybrid navigation state
+  const [navigationMode, setNavigationMode] = useState<"route" | "direct">("route")
+  const [snappedEnd, setSnappedEnd] = useState<[number, number] | null>(null)
+  const [finalTarget, setFinalTarget] = useState<[number, number] | null>(null)
 
   // Voice state
   const [isVoiceEnabled, setIsVoiceEnabled] = useState(false)
@@ -157,10 +163,53 @@ export default function FeatureMap() {
     animate()
   }, [])
 
+  const stopLiveTracking = useCallback(() => {
+    if (watchIdRef.current !== null) {
+      navigator.geolocation.clearWatch(watchIdRef.current)
+      watchIdRef.current = null
+    }
+    isTrackingRef.current = false
+  }, [])
+
   const checkProximityAndAnnounce = useCallback((currentPos: [number, number]) => {
+    // If in direct mode, give bearing-based instructions
+    if (navigationMode === "direct" && finalTarget) {
+      const distance = haversineDistance(currentPos, finalTarget)
+      
+      if (distance < 10) {
+        speak("You have arrived at your destination")
+        stopLiveTracking()
+        setIsDirectionsPanelOpen(false)
+        return
+      }
+
+      // Announce every 100, 50, 20 meters
+      for (const threshold of [100, 50, 20]) {
+        if (distance <= threshold && distance > threshold - 10 && lastProximityRef.current > threshold) {
+          lastProximityRef.current = distance
+          const bearing = turf.bearing(turf.point(currentPos), turf.point(finalTarget))
+          speak(`Proceed ${Math.round(distance)} meters ${getBearingText(bearing)}`)
+          break
+        }
+      }
+      return
+    }
+
+    // Standard OSRM route logic
     if (currentStepIndex >= routeSteps.length) return
     const step = routeSteps[currentStepIndex]
     const distance = haversineDistance(currentPos, step.maneuver.location)
+
+    // Check for transition to direct mode near the snapped end point
+    if (snappedEnd) {
+      const distToSnappedEnd = haversineDistance(currentPos, snappedEnd)
+      if (distToSnappedEnd < 30) {
+        setNavigationMode("direct")
+        speak("Switching to direct navigation for the final segment")
+        lastProximityRef.current = Infinity
+        return
+      }
+    }
 
     if (distance < 15 && step.maneuver.type.toLowerCase() !== "arrive") {
       if (!announcedStepsRef.current.has(currentStepIndex + 1)) {
@@ -183,7 +232,7 @@ export default function FeatureMap() {
       lastProximityRef.current = distance
       speak(generateInstruction(step, 0))
     }
-  }, [currentStepIndex, routeSteps])
+  }, [currentStepIndex, routeSteps, navigationMode, finalTarget, snappedEnd, stopLiveTracking])
 
   const startLiveTracking = useCallback(() => {
     if (!navigator.geolocation || watchIdRef.current !== null) return
@@ -206,14 +255,6 @@ export default function FeatureMap() {
     )
   }, [isVoiceEnabled, routeSteps, checkProximityAndAnnounce])
 
-  const stopLiveTracking = useCallback(() => {
-    if (watchIdRef.current !== null) {
-      navigator.geolocation.clearWatch(watchIdRef.current)
-      watchIdRef.current = null
-    }
-    isTrackingRef.current = false
-  }, [])
-
   const toggleGroupVisibility = (groupId: string) => {
     const groupFeatures = featureSourceRef.current.getFeatures()
       .filter((f) => String(f.get("groupId")) === groupId)
@@ -230,6 +271,20 @@ export default function FeatureMap() {
       }
       return next
     })
+  }
+
+  const getNearestRoadPoint = async (coord: [number, number]) => {
+    try {
+      const url = `${osrmRef.current.url}nearest/v1/driving/${coord[0]},${coord[1]}`
+      const res = await fetch(url)
+      const data = await res.json()
+      if (data.code === "Ok" && data.waypoints?.length > 0) {
+        return data.waypoints[0].location as [number, number]
+      }
+    } catch (e) {
+      console.warn("[FeatureMap] Failed to snap point to road:", e)
+    }
+    return coord
   }
 
   const handleRouteSelect = async (
@@ -252,76 +307,150 @@ export default function FeatureMap() {
       setCurrentStepIndex(0)
       announcedStepsRef.current.clear()
       lastProximityRef.current = Infinity
+      
+      setNavigationMode("route")
+      setFinalTarget(endCoord)
+      
+      // Step 1: Snap points to road
+      const snappedStart = await getNearestRoadPoint(startCoord)
+      const snappedEndCoord = await getNearestRoadPoint(endCoord)
+      setSnappedEnd(snappedEndCoord)
+
+      // Measure how far destination is from the road
+      const distToRoad = turf.distance(
+        turf.point(endCoord),
+        turf.point(snappedEndCoord),
+        { units: "meters" }
+      )
 
       // Handle chainage markers if requested
       if (chainageOptions?.showMarkers && chainageOptions.geometry) {
-        const line = chainageOptions.geometry
-        const lengthInKm = turf.length(line, { units: "kilometers" })
+        const originalGeom = chainageOptions.geometry
+        const lengthInKm = turf.length(originalGeom, { units: "kilometers" })
         const intervalInKm = (chainageOptions.interval || 100) / 1000
         
-        // Cap the number of markers to prevent browser crashes on extremely long lines
-        const maxMarkers = 500
-        const step = Math.max(intervalInKm, lengthInKm / maxMarkers)
+        // Ensure we have a LineString for turf.along (which doesn't support MultiLineString)
+        let lineForAlong: any = originalGeom
+        if (originalGeom.type === "MultiLineString") {
+          lineForAlong = turf.lineString(originalGeom.coordinates.flat(1)).geometry
+        }
 
-        for (let d = 0; d <= lengthInKm; d += step) {
-          const point = turf.along(line, d, { units: "kilometers" })
-          const coords = point.geometry.coordinates
-          const distanceInMeters = Math.round(d * 1000)
-          const markerFeature = new Feature({
-            geometry: new Point(fromLonLat(coords as [number, number])),
-            label: `${Math.floor(distanceInMeters / 1000)}+${(distanceInMeters % 1000).toString().padStart(3, '0')}`
+        if (lineForAlong.type === "LineString" && lineForAlong.coordinates.length >= 2 && lengthInKm > 0) {
+          // Cap the number of markers to prevent browser crashes on extremely long lines
+          const maxMarkers = 500
+          const step = Math.max(intervalInKm, lengthInKm / maxMarkers)
+
+          for (let d = 0; d <= lengthInKm; d += step) {
+            try {
+              const point = turf.along(lineForAlong, d, { units: "kilometers" })
+              const coords = point.geometry.coordinates as [number, number]
+              const distanceInMeters = Math.round(d * 1000)
+              const markerFeature = new Feature({
+                geometry: new Point(fromLonLat(coords)),
+                label: `${Math.floor(distanceInMeters / 1000)}+${(distanceInMeters % 1000).toString().padStart(3, '0')}`
+              })
+              
+              markerFeature.setStyle(new Style({
+                image: new CircleStyle({
+                  radius: 4,
+                  fill: new Fill({ color: "#ef4444" }),
+                  stroke: new Stroke({ color: "#ffffff", width: 1.5 })
+                }),
+                text: new Text({
+                  text: markerFeature.get("label"),
+                  font: "10px Inter, Arial, sans-serif",
+                  fill: new Fill({ color: "#ffffff" }),
+                  stroke: new Stroke({ color: "#000000", width: 3 }),
+                  offsetY: -12
+                })
+              }))
+              
+              chainageSourceRef.current.addFeature(markerFeature)
+            } catch (err) {
+              console.warn(`[FeatureMap] Failed to create chainage marker at distance ${d}:`, err)
+            }
+          }
+        }
+      }
+
+      // Step 2: Calculate road route
+      let routeData: any = null
+      if (distToRoad < 500) { // Only route if within 500m of a road
+        const url = `${osrmRef.current.url}route/v1/driving/${snappedStart[0]},${snappedStart[1]};${snappedEndCoord[0]},${snappedEndCoord[1]}?overview=full&geometries=geojson&steps=true`
+        const response = await fetch(url)
+        routeData = await response.json()
+      }
+
+      if (routeData && routeData.code === "Ok" && routeData.routes?.length > 0) {
+        const route: OSRMRoute = routeData.routes[0]
+        const steps = route.legs.flatMap((leg) => leg.steps)
+        
+        // Add final off-road segment to turn-by-turn steps
+        if (distToRoad > 15) {
+          steps.push({
+            maneuver: {
+              type: "direct",
+              location: endCoord,
+              instruction: `Leave road and proceed ${Math.round(distToRoad)}m off-road`
+            },
+            name: "Off-road path",
+            distance: distToRoad,
+            duration: distToRoad / 1.4
+          } as any)
+        }
+        
+        setRouteSteps(steps)
+        setRouteSummary({ distance: route.distance + distToRoad, duration: route.duration })
+        hasAnnouncedSummaryRef.current = false
+
+        const routeFeatures = geoJsonFormat.readFeatures(
+          { type: "Feature", geometry: route.geometry, properties: {} },
+          { featureProjection: "EPSG:3857" }
+        )
+
+        if (routeFeatures.length > 0) {
+          routeSourceRef.current.addFeatures(routeFeatures)
+          const extent = routeFeatures[0].getGeometry()?.getExtent()
+          if (extent) {
+            mapInstanceRef.current.getView().fit(extent, { padding: [80, 80, 280, 80], duration: 500, maxZoom: 17 })
+          }
+        }
+      } else {
+        // Fallback to direct navigation if road routing fails or destination is too far
+        setNavigationMode("direct")
+        const directDist = haversineDistance(startCoord, endCoord)
+        setRouteSummary({ distance: directDist, duration: directDist / 1.4 }) // 1.4 m/s walking speed
+        setRouteSteps([{
+          maneuver: {
+            type: "direct",
+            location: endCoord,
+            instruction: `Proceed ${Math.round(directDist)}m directly to destination`
+          },
+          name: "Direct Path",
+          distance: directDist,
+          duration: directDist / 1.4
+        } as any])
+        hasAnnouncedSummaryRef.current = false
+      }
+
+      // Step 3: Draw off-road dashed line if needed
+      if (distToRoad > 10) {
+        const offRoadLine = new Feature({
+          geometry: new LineString([fromLonLat(snappedEndCoord), fromLonLat(endCoord)])
+        })
+        offRoadLine.setStyle(new Style({
+          stroke: new Stroke({
+            color: "rgba(34, 197, 94, 0.6)",
+            width: 4,
+            lineDash: [6, 6]
           })
-          
-          markerFeature.setStyle(new Style({
-            image: new CircleStyle({
-              radius: 4,
-              fill: new Fill({ color: "#ef4444" }),
-              stroke: new Stroke({ color: "#ffffff", width: 1.5 })
-            }),
-            text: new Text({
-              text: markerFeature.get("label"),
-              font: "10px Inter, Arial, sans-serif",
-              fill: new Fill({ color: "#ffffff" }),
-              stroke: new Stroke({ color: "#000000", width: 3 }),
-              offsetY: -12
-            })
-          }))
-          
-          chainageSourceRef.current.addFeature(markerFeature)
-        }
-      }
-
-      const url = `${osrmRef.current.url}route/v1/driving/${startCoord[0]},${startCoord[1]};${endCoord[0]},${endCoord[1]}?overview=full&geometries=geojson&steps=true`
-      const response = await fetch(url)
-      const data = await response.json()
-
-      if (data.code !== "Ok" || !data.routes?.length) {
-        console.error("OSRM routing failed:", data)
-        return
-      }
-
-      const route: OSRMRoute = data.routes[0]
-      const steps = route.legs.flatMap((leg) => leg.steps)
-      setRouteSteps(steps)
-      setRouteSummary({ distance: route.distance, duration: route.duration })
-      hasAnnouncedSummaryRef.current = false
-
-      const routeFeatures = geoJsonFormat.readFeatures(
-        { type: "Feature", geometry: route.geometry, properties: {} },
-        { featureProjection: "EPSG:3857" }
-      )
-
-      if (routeFeatures.length > 0) {
-        routeSourceRef.current.addFeatures(routeFeatures)
-        const extent = routeFeatures[0].getGeometry()?.getExtent()
-        if (extent) {
-          mapInstanceRef.current.getView().fit(extent, { padding: [80, 80, 280, 80], duration: 500, maxZoom: 17 })
-        }
+        }))
+        routeSourceRef.current.addFeature(offRoadLine)
       }
 
       setIsDirectionsPanelOpen(true)
     } catch (error) {
-      console.error("Failed to calculate route:", error)
+      console.error("Failed to calculate hybrid route:", error)
     }
   }
 
@@ -478,18 +607,18 @@ export default function FeatureMap() {
         const routingFeatures = featuresData.map((feature) => {
           const geometry = parseGeometry(feature.geometry)
           if (!geometry) return null
+          
           let coordinates: [number, number] | null = null
           try {
-            const geo = geoJsonFormat.writeGeometryObject(geoJsonFormat.readGeometry(feature.geometry as any))
-            if (geo.type === "Point" && geo.coordinates) {
-              coordinates = geo.coordinates as [number, number]
-            } else if ((geo.type === "LineString" || geo.type === "Polygon") && geo.coordinates) {
-              const coords = geo.type === "LineString"
-                ? (geo.coordinates as [number, number][])
-                : ((geo.coordinates as any)[0] as [number, number][])
-              if (coords.length > 0) coordinates = coords[0]
-            }
-          } catch { /* skip */ }
+            // Use turf to get a reliable representative point on the feature regardless of geometry type
+            // This handles Point, LineString, Polygon, MultiLineString, MultiPolygon, etc.
+            const feat = turf.feature(geometry as any)
+            const pointOnFeature = turf.pointOnFeature(feat)
+            coordinates = pointOnFeature.geometry.coordinates as [number, number]
+          } catch (e) {
+            console.warn(`[FeatureMap] Failed to extract coordinates for feature ${feature.id}:`, e)
+          }
+
           return coordinates ? { 
             id: feature.id, 
             name: feature.name, 
@@ -497,7 +626,7 @@ export default function FeatureMap() {
             parentId: feature.parentId, 
             parentName: feature.parentName, 
             groupName: feature.groupName,
-            geometry: parseGeometry(feature.geometry)
+            geometry
           } : null
         }).filter(Boolean) as typeof projectFeatures
 
@@ -682,6 +811,7 @@ export default function FeatureMap() {
         totalDistance={routeSummary.distance}
         totalDuration={routeSummary.duration}
         currentStepIndex={currentStepIndex}
+        navigationMode={navigationMode}
       />
 
       {selectedIssue && (
