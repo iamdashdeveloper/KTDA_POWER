@@ -21,6 +21,7 @@ export class ApiClient {
       headers.Authorization = `Bearer ${token}`
     }
 
+    console.log(`[ApiClient] ${options.method || 'GET'} ${url}`)
     const response = await fetch(url, {
       ...options,
       headers,
@@ -28,7 +29,9 @@ export class ApiClient {
     })
 
     if (!response.ok) {
+      console.error(`[ApiClient] Request failed with status ${response.status}: ${url}`)
       const error = await response.json().catch(() => ({}))
+      console.error(`[ApiClient] Error details:`, error)
       throw new Error(error.error || error.message || "Request failed")
     }
 

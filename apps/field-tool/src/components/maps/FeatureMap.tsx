@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react"
+import { useEffect, useRef, useState, useCallback } from "react"
 import Map from "ol/Map"
 import View from "ol/View"
 import TileLayer from "ol/layer/Tile"
@@ -8,7 +8,6 @@ import { fromLonLat } from "ol/proj"
 import OSM from "ol/source/OSM"
 import XYZ from "ol/source/XYZ"
 import { defaults as defaultControls } from "ol/control/defaults"
-import GeoJSON from "ol/format/GeoJSON"
 import Point from "ol/geom/Point"
 import Feature from "ol/Feature"
 import Style from "ol/style/Style"
@@ -16,165 +15,26 @@ import Fill from "ol/style/Fill"
 import Stroke from "ol/style/Stroke"
 import CircleStyle from "ol/style/Circle"
 import Text from "ol/style/Text"
+import * as turf from "@turf/turf"
 import { Button } from "@workspace/ui/components/button"
-import {
-  Eye,
-  EyeOff,
-  Layers3,
-  Map as MapIcon,
-  Plus,
-  Triangle,
-  X,
-} from "lucide-react"
+import { Triangle, Plus } from "lucide-react"
 import { MapTriggeredIssueForm } from "@/components/forms/MapTriggeredIssueForm"
 import { IssueDetailsModal } from "@/components/modals/IssueDetailsModal"
+import { RoutingModal, type DestinationType } from "@/components/modals/RoutingModal"
 import { ApiClient } from "@/lib/api"
 import type { Issue } from "@/lib/issueLoader"
 import { useProjectStore } from "@/store/useProjectStore"
-import {
-  loadProjectFeatures,
-  loadProjectIssues,
-  parseGeometry,
-  parseIssueCoordinates,
-} from "@/lib/mapData"
-import {
-  createEmpty as createEmptyExtent,
-  extend as extendExtent,
-} from "ol/extent"
-
-const DEFAULT_CENTER: [number, number] = [37.9062, -0.0236]
-const DEFAULT_ZOOM = 6
-const PROJECT_LOCATION_ZOOM = 17
-const geoJsonFormat = new GeoJSON()
-
-type Basemap = "osm" | "satellite"
-
-const satelliteAttribution =
-  'Tiles © <a href="https://www.esri.com/" target="_blank" rel="noreferrer">Esri</a>, Maxar, Earthstar Geographics, and the GIS User Community'
-
-function featureStyleFunction(feature: any) {
-  const geometry = feature.getGeometry()
-  const geometryType = geometry?.getType()
-
-  if (geometryType === "Point" || geometryType === "MultiPoint") {
-    return new Style({
-      image: new CircleStyle({
-        radius: 6,
-        fill: new Fill({ color: "rgba(59, 130, 246, 0.9)" }),
-        stroke: new Stroke({ color: "#ffffff", width: 2 }),
-      }),
-    })
-  }
-
-  if (geometryType === "LineString" || geometryType === "MultiLineString") {
-    return new Style({
-      stroke: new Stroke({ color: "rgba(14, 165, 233, 0.95)", width: 3 }),
-    })
-  }
-
-  return new Style({
-    fill: new Fill({ color: "rgba(59, 130, 246, 0.15)" }),
-    stroke: new Stroke({ color: "rgba(59, 130, 246, 0.95)", width: 2 }),
-  })
-}
-
-function issueStyleFunction(feature: any) {
-  const status = String(feature.get("status") || "OPEN").toUpperCase()
-  const priority = Number(feature.get("priority") || 0)
-
-  const palette: Record<string, { fill: string; stroke: string }> = {
-    OPEN: { fill: "rgba(239, 68, 68, 0.95)", stroke: "#991b1b" },
-    IN_PROGRESS: { fill: "rgba(245, 158, 11, 0.95)", stroke: "#b45309" },
-    ON_HOLD: { fill: "rgba(168, 85, 247, 0.95)", stroke: "#7c3aed" },
-    RESOLVED: { fill: "rgba(16, 185, 129, 0.95)", stroke: "#047857" },
-    CLOSED: { fill: "rgba(107, 114, 128, 0.95)", stroke: "#374151" },
-  }
-
-  const colors = palette[status] || palette.OPEN
-  const radius = Math.max(8, 8 + priority * 3)
-
-  return new Style({
-    image: new CircleStyle({
-      radius,
-      fill: new Fill({ color: colors.fill }),
-      stroke: new Stroke({ color: "#ffffff", width: 2 }),
-    }),
-    text: new Text({
-      text: "!",
-      fill: new Fill({ color: "#ffffff" }),
-      stroke: new Stroke({ color: "rgba(0,0,0,0.35)", width: 3 }),
-      font: "800 11px Inter, Arial, sans-serif",
-      offsetY: 0,
-    }),
-  })
-}
-
-function formatLayerCount(count: number, label: string) {
-  return `${count} ${label}${count === 1 ? "" : "s"}`
-}
-
-interface LegendGroupItem {
-  id: string
-  name: string
-  geometryType: string
-  count: number
-}
-
-function getFeatureColor(geometryType: string): string {
-  if (geometryType === "Point" || geometryType === "MultiPoint") {
-    return "#3b82f6"
-  }
-
-  if (geometryType === "LineString" || geometryType === "MultiLineString") {
-    return "#0ea5e9"
-  }
-
-  return "#2563eb"
-}
-
-function getProjectCoordinates(
-  location:
-    | {
-        latitude: number
-        longitude: number
-      }
-    | string
-    | null
-    | undefined
-): [number, number] | null {
-  if (!location) {
-    return null
-  }
-
-  if (typeof location === "object") {
-    const latitude = Number(location.latitude)
-    const longitude = Number(location.longitude)
-    if (Number.isFinite(latitude) && Number.isFinite(longitude)) {
-      return [longitude, latitude]
-    }
-    return null
-  }
-
-  try {
-    const parsed = JSON.parse(location)
-
-    if (
-      parsed?.type === "Point" &&
-      Array.isArray(parsed.coordinates) &&
-      parsed.coordinates.length >= 2
-    ) {
-      const longitude = Number(parsed.coordinates[0])
-      const latitude = Number(parsed.coordinates[1])
-      if (Number.isFinite(latitude) && Number.isFinite(longitude)) {
-        return [longitude, latitude]
-      }
-    }
-  } catch {
-    return null
-  }
-
-  return null
-}
+import { loadProjectFeatures, loadProjectIssues, parseGeometry, parseIssueCoordinates } from "@/lib/mapData"
+import { createEmpty as createEmptyExtent, extend as extendExtent } from "ol/extent"
+import type { Basemap, OSRMRoute, LegendGroupItem } from "./types"
+import { DEFAULT_CENTER, DEFAULT_ZOOM, PROJECT_LOCATION_ZOOM, geoJsonFormat, satelliteAttribution } from "./constants"
+import { featureStyleFunction, issueStyleFunction } from "./mapStyles"
+import { getProjectCoordinates, haversineDistance, generateInstruction, formatDistance, formatDuration, getThemeColor, setStoredLayerColor } from "./mapUtils"
+import { speak, stopSpeaking, useVoicesPreload } from "./voiceUtils"
+import { DirectionsPanel } from "./DirectionsPanel"
+import { MapToolbar } from "./MapToolbar"
+import { MapLegend } from "./MapLegend"
+import type { RouteStep } from "./types"
 
 export default function FeatureMap() {
   const activeProject = useProjectStore((state) => state.activeProject)
@@ -184,58 +44,294 @@ export default function FeatureMap() {
   const satelliteLayerRef = useRef<TileLayer<XYZ> | null>(null)
   const featureSourceRef = useRef(new VectorSource())
   const issueSourceRef = useRef(new VectorSource())
+  const routeSourceRef = useRef(new VectorSource())
+  const chainageSourceRef = useRef(new VectorSource())
   const featureLayerRef = useRef<VectorLayer<VectorSource> | null>(null)
   const issueLayerRef = useRef<VectorLayer<VectorSource> | null>(null)
+  const routeLayerRef = useRef<VectorLayer<VectorSource> | null>(null)
+  const chainageLayerRef = useRef<VectorLayer<VectorSource> | null>(null)
+  const osrmRef = useRef<any>(null)
+
+  // Live location refs
+  const liveLocationSourceRef = useRef(new VectorSource())
+  const liveLocationLayerRef = useRef<VectorLayer<VectorSource> | null>(null)
+  const liveLocationFeatureRef = useRef<Feature<Point> | null>(null)
+  const pulseFeatureRef = useRef<Feature<Point> | null>(null)
+  const watchIdRef = useRef<number | null>(null)
+  const isTrackingRef = useRef(false)
+
   const [basemap, setBasemap] = useState<Basemap>("osm")
   const [isLoading, setIsLoading] = useState(false)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
   const [featureCount, setFeatureCount] = useState(0)
   const [isLegendOpen, setIsLegendOpen] = useState(false)
   const [isIssueFormOpen, setIsIssueFormOpen] = useState(false)
+  const [isRoutingModalOpen, setIsRoutingModalOpen] = useState(false)
   const [selectedIssue, setSelectedIssue] = useState<Issue | null>(null)
   const [dataReloadKey, setDataReloadKey] = useState(0)
+  const handleColorChange = (groupId: string, color: string) => {
+    setStoredLayerColor(groupId, color)
+    featureSourceRef.current.changed()
+    // Don't reload all data - just trigger style update via source.changed()
+    // This prevents infinite render loops when opening routing modal
+  }
+
   const [legendGroups, setLegendGroups] = useState<LegendGroupItem[]>([])
   const [hiddenGroupIds, setHiddenGroupIds] = useState<Set<string>>(new Set())
+  const [projectFeatures, setProjectFeatures] = useState<Array<{
+    id: string; name: string; coordinates: [number, number]
+    parentId?: string | null; parentName?: string | null; groupName?: string | null
+    geometry?: any
+  }>>([])
+  const [projectIssues, setProjectIssues] = useState<any[]>([])
 
-  const toggleGroupVisibility = (groupId: string) => {
-    const source = featureSourceRef.current
-    const groupFeatures = source
-      .getFeatures()
-      .filter((feature) => String(feature.get("groupId")) === groupId)
+  // Directions state
+  const [isDirectionsPanelOpen, setIsDirectionsPanelOpen] = useState(false)
+  const [routeSteps, setRouteSteps] = useState<RouteStep[]>([])
+  const [routeSummary, setRouteSummary] = useState<{ distance: number; duration: number }>({ distance: 0, duration: 0 })
+  const [currentStepIndex, setCurrentStepIndex] = useState(0)
 
-    if (groupFeatures.length === 0) {
+  // Voice state
+  const [isVoiceEnabled, setIsVoiceEnabled] = useState(false)
+  const announcedStepsRef = useRef<Set<number>>(new Set())
+  const lastProximityRef = useRef<number>(Infinity)
+  const hasAnnouncedSummaryRef = useRef(false)
+
+  useVoicesPreload()
+
+  useEffect(() => {
+    if (!isVoiceEnabled || routeSteps.length === 0 || hasAnnouncedSummaryRef.current) return
+    hasAnnouncedSummaryRef.current = true
+    const intro = `Starting navigation. Route is ${formatDistance(routeSummary.distance)}, about ${formatDuration(routeSummary.duration)}. ${generateInstruction(routeSteps[0])}`
+    speak(intro)
+  }, [isVoiceEnabled, routeSteps, routeSummary])
+
+  /* ---------------------------------------------------------------- */
+  /*  Live location — pulsing blue dot                                 */
+  /* ---------------------------------------------------------------- */
+  const createLiveLocationLayer = useCallback(() => {
+    if (!mapInstanceRef.current) return
+
+    const dotFeature = new Feature({ geometry: new Point(fromLonLat([0, 0])) })
+    dotFeature.setStyle(new Style({
+      image: new CircleStyle({
+        radius: 8,
+        fill: new Fill({ color: getThemeColor("--primary") }),
+        stroke: new Stroke({ color: getThemeColor("--background"), width: 3 }),
+      }),
+    }))
+
+    const pulseFeature = new Feature({ geometry: new Point(fromLonLat([0, 0])) })
+    pulseFeature.setStyle(new Style({
+      image: new CircleStyle({
+        radius: 20,
+        fill: new Fill({ color: getThemeColor("--primary", 0.2) }),
+        stroke: new Stroke({ color: getThemeColor("--primary", 0.4), width: 2 }),
+      }),
+    }))
+
+    const layer = new VectorLayer({ source: liveLocationSourceRef.current, zIndex: 100 })
+    liveLocationSourceRef.current.addFeature(dotFeature)
+    liveLocationSourceRef.current.addFeature(pulseFeature)
+    liveLocationFeatureRef.current = dotFeature
+    pulseFeatureRef.current = pulseFeature
+    liveLocationLayerRef.current = layer
+    mapInstanceRef.current.addLayer(layer)
+
+    let radius = 20
+    let growing = true
+    const animate = () => {
+      if (!pulseFeature) return
+      growing ? (radius += 0.5) : (radius -= 0.5)
+      if (radius >= 30) growing = false
+      if (radius <= 18) growing = true
+      pulseFeature.setStyle(new Style({
+        image: new CircleStyle({
+          radius,
+          fill: new Fill({ color: getThemeColor("--primary", 0.2 - (radius - 20) / 100) }),
+          stroke: new Stroke({ color: getThemeColor("--primary", 0.4 - (radius - 20) / 80), width: 2 }),
+        }),
+      }))
+      requestAnimationFrame(animate)
+    }
+    animate()
+  }, [])
+
+  const checkProximityAndAnnounce = useCallback((currentPos: [number, number]) => {
+    if (currentStepIndex >= routeSteps.length) return
+    const step = routeSteps[currentStepIndex]
+    const distance = haversineDistance(currentPos, step.maneuver.location)
+
+    if (distance < 15 && step.maneuver.type.toLowerCase() !== "arrive") {
+      if (!announcedStepsRef.current.has(currentStepIndex + 1)) {
+        setCurrentStepIndex((prev) => prev + 1)
+        announcedStepsRef.current.add(currentStepIndex + 1)
+        lastProximityRef.current = Infinity
+      }
       return
     }
 
-    setHiddenGroupIds((previousIds) => {
-      const nextIds = new Set(previousIds)
-
-      if (nextIds.has(groupId)) {
-        nextIds.delete(groupId)
-        for (const feature of groupFeatures) {
-          feature.setStyle(undefined)
-        }
-      } else {
-        nextIds.add(groupId)
-        for (const feature of groupFeatures) {
-          feature.setStyle(() => [])
-        }
+    for (const threshold of [200, 100, 50]) {
+      if (distance <= threshold && distance > threshold - 20 && lastProximityRef.current > threshold) {
+        lastProximityRef.current = distance
+        speak(generateInstruction(step, distance))
+        break
       }
+    }
 
-      return nextIds
+    if (distance <= 20 && lastProximityRef.current > 20) {
+      lastProximityRef.current = distance
+      speak(generateInstruction(step, 0))
+    }
+  }, [currentStepIndex, routeSteps])
+
+  const startLiveTracking = useCallback(() => {
+    if (!navigator.geolocation || watchIdRef.current !== null) return
+    isTrackingRef.current = true
+    watchIdRef.current = navigator.geolocation.watchPosition(
+      (position) => {
+        const coords: [number, number] = [position.coords.longitude, position.coords.latitude]
+        const olCoords = fromLonLat(coords)
+        liveLocationFeatureRef.current?.setGeometry(new Point(olCoords))
+        pulseFeatureRef.current?.setGeometry(new Point(olCoords))
+        if (mapInstanceRef.current && isTrackingRef.current) {
+          mapInstanceRef.current.getView().setCenter(olCoords)
+        }
+        if (isVoiceEnabled && routeSteps.length > 0) {
+          checkProximityAndAnnounce(coords)
+        }
+      },
+      (error) => console.error("Live tracking error:", error),
+      { enableHighAccuracy: true, maximumAge: 5000, timeout: 10000 }
+    )
+  }, [isVoiceEnabled, routeSteps, checkProximityAndAnnounce])
+
+  const stopLiveTracking = useCallback(() => {
+    if (watchIdRef.current !== null) {
+      navigator.geolocation.clearWatch(watchIdRef.current)
+      watchIdRef.current = null
+    }
+    isTrackingRef.current = false
+  }, [])
+
+  const toggleGroupVisibility = (groupId: string) => {
+    const groupFeatures = featureSourceRef.current.getFeatures()
+      .filter((f) => String(f.get("groupId")) === groupId)
+    if (groupFeatures.length === 0) return
+
+    setHiddenGroupIds((prev) => {
+      const next = new Set(prev)
+      if (next.has(groupId)) {
+        next.delete(groupId)
+        groupFeatures.forEach((f) => f.setStyle(undefined))
+      } else {
+        next.add(groupId)
+        groupFeatures.forEach((f) => f.setStyle(() => []))
+      }
+      return next
     })
   }
 
-  useEffect(() => {
-    if (!mapRef.current || mapInstanceRef.current) {
-      return
+  const handleRouteSelect = async (
+    startCoord: [number, number],
+    endCoord: [number, number],
+    _destinationType: DestinationType,
+    chainageOptions?: {
+      interval: number
+      showMarkers: boolean
+      geometry: any
     }
+  ) => {
+    if (!osrmRef.current || !routeSourceRef.current || !mapInstanceRef.current) return
 
-    const osmLayer = new TileLayer({
-      source: new OSM(),
-      visible: true,
-    })
+    try {
+      routeSourceRef.current.clear(true)
+      chainageSourceRef.current.clear(true)
+      setIsDirectionsPanelOpen(false)
+      setRouteSteps([])
+      setCurrentStepIndex(0)
+      announcedStepsRef.current.clear()
+      lastProximityRef.current = Infinity
 
+      // Handle chainage markers if requested
+      if (chainageOptions?.showMarkers && chainageOptions.geometry) {
+        const line = chainageOptions.geometry
+        const lengthInKm = turf.length(line, { units: "kilometers" })
+        const intervalInKm = (chainageOptions.interval || 100) / 1000
+        
+        // Cap the number of markers to prevent browser crashes on extremely long lines
+        const maxMarkers = 500
+        const step = Math.max(intervalInKm, lengthInKm / maxMarkers)
+
+        for (let d = 0; d <= lengthInKm; d += step) {
+          const point = turf.along(line, d, { units: "kilometers" })
+          const coords = point.geometry.coordinates
+          const distanceInMeters = Math.round(d * 1000)
+          const markerFeature = new Feature({
+            geometry: new Point(fromLonLat(coords as [number, number])),
+            label: `${Math.floor(distanceInMeters / 1000)}+${(distanceInMeters % 1000).toString().padStart(3, '0')}`
+          })
+          
+          markerFeature.setStyle(new Style({
+            image: new CircleStyle({
+              radius: 4,
+              fill: new Fill({ color: "#ef4444" }),
+              stroke: new Stroke({ color: "#ffffff", width: 1.5 })
+            }),
+            text: new Text({
+              text: markerFeature.get("label"),
+              font: "10px Inter, Arial, sans-serif",
+              fill: new Fill({ color: "#ffffff" }),
+              stroke: new Stroke({ color: "#000000", width: 3 }),
+              offsetY: -12
+            })
+          }))
+          
+          chainageSourceRef.current.addFeature(markerFeature)
+        }
+      }
+
+      const url = `${osrmRef.current.url}route/v1/driving/${startCoord[0]},${startCoord[1]};${endCoord[0]},${endCoord[1]}?overview=full&geometries=geojson&steps=true`
+      const response = await fetch(url)
+      const data = await response.json()
+
+      if (data.code !== "Ok" || !data.routes?.length) {
+        console.error("OSRM routing failed:", data)
+        return
+      }
+
+      const route: OSRMRoute = data.routes[0]
+      const steps = route.legs.flatMap((leg) => leg.steps)
+      setRouteSteps(steps)
+      setRouteSummary({ distance: route.distance, duration: route.duration })
+      hasAnnouncedSummaryRef.current = false
+
+      const routeFeatures = geoJsonFormat.readFeatures(
+        { type: "Feature", geometry: route.geometry, properties: {} },
+        { featureProjection: "EPSG:3857" }
+      )
+
+      if (routeFeatures.length > 0) {
+        routeSourceRef.current.addFeatures(routeFeatures)
+        const extent = routeFeatures[0].getGeometry()?.getExtent()
+        if (extent) {
+          mapInstanceRef.current.getView().fit(extent, { padding: [80, 80, 280, 80], duration: 500, maxZoom: 17 })
+        }
+      }
+
+      setIsDirectionsPanelOpen(true)
+    } catch (error) {
+      console.error("Failed to calculate route:", error)
+    }
+  }
+
+  /* ---------------------------------------------------------------- */
+  /*  Map initialization                                               */
+  /* ---------------------------------------------------------------- */
+  useEffect(() => {
+    if (!mapRef.current || mapInstanceRef.current) return
+
+    const osmLayer = new TileLayer({ source: new OSM(), visible: true })
     const satelliteLayer = new TileLayer({
       source: new XYZ({
         url: "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
@@ -244,102 +340,81 @@ export default function FeatureMap() {
       }),
       visible: false,
     })
-
-    const featureLayer = new VectorLayer({
-      source: featureSourceRef.current,
-      style: featureStyleFunction,
-      zIndex: 20,
+    const featureLayer = new VectorLayer({ source: featureSourceRef.current, style: featureStyleFunction, zIndex: 20 })
+    const issueLayer = new VectorLayer({ source: issueSourceRef.current, style: issueStyleFunction, zIndex: 30 })
+    const routeLayer = new VectorLayer({
+      source: routeSourceRef.current,
+      style: new Style({ stroke: new Stroke({ color: "rgba(34, 197, 94, 0.8)", width: 4 }) }),
+      zIndex: 25,
     })
-
-    const issueLayer = new VectorLayer({
-      source: issueSourceRef.current,
-      style: issueStyleFunction,
-      zIndex: 30,
+    const chainageLayer = new VectorLayer({
+      source: chainageSourceRef.current,
+      zIndex: 35,
     })
 
     osmLayerRef.current = osmLayer
     satelliteLayerRef.current = satelliteLayer
     featureLayerRef.current = featureLayer
     issueLayerRef.current = issueLayer
+    routeLayerRef.current = routeLayer
+    chainageLayerRef.current = chainageLayer
+    osrmRef.current = { url: "https://router.project-osrm.org/" }
 
     const map = new Map({
       target: mapRef.current,
-      controls: defaultControls({
-        zoom: true,
-        rotate: false,
-        attribution: true,
-      }),
-      layers: [satelliteLayer, osmLayer, featureLayer, issueLayer],
-      view: new View({
-        center: fromLonLat(DEFAULT_CENTER),
-        zoom: DEFAULT_ZOOM,
-      }),
+      controls: defaultControls({ zoom: true, rotate: false, attribution: true }),
+      layers: [satelliteLayer, osmLayer, featureLayer, routeLayer, issueLayer, chainageLayer],
+      view: new View({ center: fromLonLat(DEFAULT_CENTER), zoom: DEFAULT_ZOOM }),
     })
 
     map.on("click", async (event) => {
-      const clicked = map.forEachFeatureAtPixel(
-        event.pixel,
-        (feature) => feature
-      ) as Feature | undefined
-
-      if (!clicked) {
-        return
-      }
-
+      const clicked = map.forEachFeatureAtPixel(event.pixel, (f) => f) as Feature | undefined
+      if (!clicked) return
       const issueId = clicked.get("issueId")
-      if (!issueId) {
-        return
-      }
-
+      if (!issueId) return
       try {
         const issue = await ApiClient.get<Issue>(`/issues/${issueId}`)
         setSelectedIssue(issue)
-      } catch (error) {
-        console.error("Failed to load issue details:", error)
-        const fallbackIssue = clicked.get("issueData") as Issue | undefined
-        if (fallbackIssue) {
-          setSelectedIssue(fallbackIssue)
-        }
+      } catch {
+        const fallback = clicked.get("issueData") as Issue | undefined
+        if (fallback) setSelectedIssue(fallback)
       }
     })
 
     mapInstanceRef.current = map
+    createLiveLocationLayer()
 
     return () => {
+      stopLiveTracking()
       map.setTarget(undefined)
       mapInstanceRef.current = null
       osmLayerRef.current = null
       satelliteLayerRef.current = null
       featureLayerRef.current = null
       issueLayerRef.current = null
+      routeLayerRef.current = null
+      chainageLayerRef.current = null
+      osrmRef.current = null
     }
-  }, [])
+  }, [createLiveLocationLayer, stopLiveTracking])
 
+  // Basemap toggle
   useEffect(() => {
-    if (!osmLayerRef.current || !satelliteLayerRef.current) {
-      return
-    }
-
+    if (!osmLayerRef.current || !satelliteLayerRef.current) return
     const showSatellite = basemap === "satellite"
     osmLayerRef.current.setVisible(!showSatellite)
     satelliteLayerRef.current.setVisible(showSatellite)
   }, [basemap])
 
+  // Animate to project location
   useEffect(() => {
     const map = mapInstanceRef.current
-    const projectCoordinates = getProjectCoordinates(activeProject?.location)
+    const coords = getProjectCoordinates(activeProject?.location)
+    if (!map || !coords) return
+    map.getView().animate({ center: fromLonLat(coords), zoom: PROJECT_LOCATION_ZOOM, duration: 450 })
+  }, [activeProject?.id])
 
-    if (!map || !projectCoordinates) {
-      return
-    }
-
-    map.getView().animate({
-      center: fromLonLat(projectCoordinates),
-      zoom: PROJECT_LOCATION_ZOOM,
-      duration: 450,
-    })
-  }, [activeProject?.id, activeProject?.location])
-
+  // Load project data
   useEffect(() => {
     const projectId = activeProject?.id
     const projectCoordinates = getProjectCoordinates(activeProject?.location)
@@ -361,225 +436,166 @@ export default function FeatureMap() {
       setErrorMessage(null)
 
       try {
-        let effectiveProjectCoordinates = projectCoordinates
-
-        if (!effectiveProjectCoordinates) {
+        let effectiveCoords = projectCoordinates
+        if (!effectiveCoords) {
           try {
-            const project = await ApiClient.get<{
-              location?:
-                | {
-                    latitude: number
-                    longitude: number
-                  }
-                | string
-                | null
-            }>(`/projects/${projectId}`)
-
-            effectiveProjectCoordinates = getProjectCoordinates(
-              project?.location
-            )
-          } catch (locationError) {
-            console.warn(
-              "Failed to resolve project location for map centering:",
-              locationError
-            )
+            const project = await ApiClient.get<{ location?: { latitude: number; longitude: number } | string | null }>(`/projects/${projectId}`)
+            effectiveCoords = getProjectCoordinates(project?.location)
+          } catch (e) {
+            console.warn("Failed to resolve project location:", e)
           }
         }
 
         const map = mapInstanceRef.current
-        if (map && effectiveProjectCoordinates) {
+        if (map && effectiveCoords) {
           const view = map.getView()
-          view.setCenter(fromLonLat(effectiveProjectCoordinates))
+          view.setCenter(fromLonLat(effectiveCoords))
           view.setZoom(PROJECT_LOCATION_ZOOM)
         }
 
-        const [projectFeatures, projectIssues] = await Promise.all([
+        console.log(`[FeatureMap] Loading data for project: ${projectId}`)
+        const [featuresData, issuesData] = await Promise.all([
           loadProjectFeatures(projectId),
           loadProjectIssues(projectId),
         ])
+        console.log(`[FeatureMap] Loaded ${featuresData?.length || 0} features and ${issuesData?.length || 0} issues`)
 
-        if (cancelled) {
-          return
-        }
+        if (cancelled) return
 
+        setProjectIssues(issuesData)
         featureSourceRef.current.clear(true)
         issueSourceRef.current.clear(true)
 
+        // Build routing-compatible feature list
+        const routingFeatures = featuresData.map((feature) => {
+          const geometry = parseGeometry(feature.geometry)
+          if (!geometry) return null
+          let coordinates: [number, number] | null = null
+          try {
+            const geo = geoJsonFormat.writeGeometryObject(geoJsonFormat.readGeometry(feature.geometry as any))
+            if (geo.type === "Point" && geo.coordinates) {
+              coordinates = geo.coordinates as [number, number]
+            } else if ((geo.type === "LineString" || geo.type === "Polygon") && geo.coordinates) {
+              const coords = geo.type === "LineString"
+                ? (geo.coordinates as [number, number][])
+                : ((geo.coordinates as any)[0] as [number, number][])
+              if (coords.length > 0) coordinates = coords[0]
+            }
+          } catch { /* skip */ }
+          return coordinates ? { 
+            id: feature.id, 
+            name: feature.name, 
+            coordinates, 
+            parentId: feature.parentId, 
+            parentName: feature.parentName, 
+            groupName: feature.groupName,
+            geometry: parseGeometry(feature.geometry)
+          } : null
+        }).filter(Boolean) as typeof projectFeatures
+
+        setProjectFeatures(routingFeatures)
+
+        // Render features on map
         const featureCollection = {
           type: "FeatureCollection" as const,
-          features: projectFeatures
-            .map((feature) => {
-              const geometry = parseGeometry(feature.geometry)
-              if (!geometry) {
-                return null
-              }
-
-              return {
-                type: "Feature" as const,
-                geometry,
-                properties: {
-                  id: feature.id,
-                  name: feature.name,
-                  groupId: feature.parentId || feature.id,
-                  groupName:
-                    feature.groupName || feature.parentName || feature.name,
-                  projectId: feature.projectId,
-                  parentId: feature.parentId,
-                  createdAt: feature.createdAt,
-                  details: feature.details,
-                  images: feature.images,
-                },
-              }
-            })
-            .filter(Boolean),
+          features: featuresData.map((feature) => {
+            const geometry = parseGeometry(feature.geometry)
+            if (!geometry) return null
+            return {
+              type: "Feature" as const,
+              geometry,
+              properties: {
+                id: feature.id, name: feature.name,
+                groupId: feature.parentId || feature.id,
+                groupName: feature.groupName || feature.parentName || feature.name,
+                projectId: feature.projectId, parentId: feature.parentId,
+                createdAt: feature.createdAt, details: feature.details, images: feature.images,
+              },
+            }
+          }).filter(Boolean),
         }
 
-        const renderedFeatures = geoJsonFormat.readFeatures(featureCollection, {
-          featureProjection: "EPSG:3857",
-        })
-
+        const renderedFeatures = geoJsonFormat.readFeatures(featureCollection, { featureProjection: "EPSG:3857" })
         featureSourceRef.current.addFeatures(renderedFeatures)
         setHiddenGroupIds(new Set())
 
+        // Build legend groups
         const groupMap: Record<string, LegendGroupItem> = {}
-
-        for (const feature of renderedFeatures) {
-          const groupId = String(
-            feature.get("groupId") || feature.get("id") || ""
-          )
-          if (!groupId) {
-            continue
-          }
-
-          const geometryType = feature.getGeometry()?.getType() || "Unknown"
-          const groupName = String(
-            feature.get("groupName") || feature.get("name") || "Unnamed group"
-          )
-
+        for (const f of renderedFeatures) {
+          const groupId = String(f.get("groupId") || f.get("id") || "")
+          if (!groupId) continue
+          const geometryType = f.getGeometry()?.getType() || "Unknown"
+          const groupName = String(f.get("groupName") || f.get("name") || "Unnamed group")
           const existing = groupMap[groupId]
           if (existing) {
             existing.count += 1
-            if (existing.geometryType !== geometryType) {
-              existing.geometryType = "Mixed"
-            }
+            if (existing.geometryType !== geometryType) existing.geometryType = "Mixed"
           } else {
-            groupMap[groupId] = {
-              id: groupId,
-              name: groupName,
-              geometryType,
-              count: 1,
-            }
+            groupMap[groupId] = { id: groupId, name: groupName, geometryType, count: 1 }
           }
         }
-
         setLegendGroups(Object.values(groupMap))
 
-        const issueFeatures = projectIssues
-          .map((issue) => {
-            const coordinates = parseIssueCoordinates(issue)
-            if (!coordinates) {
-              return null
-            }
-
-            const point = new Point(fromLonLat(coordinates))
-            const feature = new Feature({
-              geometry: point,
-              id: issue.id,
-              issueId: issue.id,
-              issueData: issue,
-              title: issue.title,
-              status: issue.status,
-              priority: issue.priority,
-              description: issue.description,
-            })
-            return feature
+        // Render issues
+        const issueFeatures = issuesData.map((issue) => {
+          const coords = parseIssueCoordinates(issue)
+          if (!coords) return null
+          const feat = new Feature({
+            geometry: new Point(fromLonLat(coords)),
+            id: issue.id, issueId: issue.id, issueData: issue,
+            title: issue.title, status: issue.status, priority: issue.priority, description: issue.description,
           })
-          .filter(Boolean) as Feature<Point>[]
+          return feat
+        }).filter(Boolean) as Feature<Point>[]
 
         issueSourceRef.current.addFeatures(issueFeatures)
-
         setFeatureCount(renderedFeatures.length)
 
-        const combinedExtent = createEmptyExtent()
-        let hasExtent = false
-
-        for (const source of [
-          featureSourceRef.current,
-          issueSourceRef.current,
-        ]) {
-          source.forEachFeature((feature) => {
-            const geometry = feature.getGeometry()
-            if (!geometry) {
-              return
-            }
-
-            extendExtent(combinedExtent, geometry.getExtent())
-            hasExtent = true
-          })
-        }
-
-        if (hasExtent && !effectiveProjectCoordinates) {
-          const mapWithData = mapInstanceRef.current
-          if (mapWithData) {
-            mapWithData.getView().fit(combinedExtent, {
-              padding: [48, 48, 48, 48],
-              duration: 500,
-              maxZoom: 18,
+        // Fit map to data extent if no project coordinates
+        if (!effectiveCoords) {
+          const combinedExtent = createEmptyExtent()
+          let hasExtent = false
+          for (const source of [featureSourceRef.current, issueSourceRef.current]) {
+            source.forEachFeature((f) => {
+              const geom = f.getGeometry()
+              if (!geom) return
+              extendExtent(combinedExtent, geom.getExtent())
+              hasExtent = true
             })
+          }
+          if (hasExtent && mapInstanceRef.current) {
+            mapInstanceRef.current.getView().fit(combinedExtent, { padding: [48, 48, 48, 48], duration: 500, maxZoom: 18 })
           }
         }
       } catch (error) {
         console.error("Failed to load project map data:", error)
         if (!cancelled) {
-          setErrorMessage(
-            error instanceof Error
-              ? error.message
-              : "Failed to load project map data"
-          )
+          setErrorMessage(error instanceof Error ? error.message : "Failed to load project map data")
         }
       } finally {
-        if (!cancelled) {
-          setIsLoading(false)
-        }
+        if (!cancelled) setIsLoading(false)
       }
     }
 
     loadProjectData()
-
-    return () => {
-      cancelled = true
-    }
-  }, [activeProject?.id, activeProject?.location, dataReloadKey])
+    return () => { cancelled = true }
+  }, [activeProject?.id])
 
   return (
-    <div className="relative h-[calc(100vh-0px)] w-full overflow-hidden bg-slate-950">
+    <div className="relative h-[calc(100vh-0px)] w-full overflow-hidden bg-background">
       <div ref={mapRef} className="h-full w-full" />
 
-      <div className="absolute top-4 left-4 z-10 flex max-w-[calc(100%-2rem)] flex-wrap items-center gap-3 rounded-2xl bg-white/90 p-2 shadow-lg backdrop-blur dark:bg-slate-900/90">
-        <Button
-          type="button"
-          variant={basemap === "osm" ? "default" : "outline"}
-          size="sm"
-          onClick={() => setBasemap("osm")}
-          className="gap-2"
-        >
-          <MapIcon className="h-4 w-4" />
-          OSM
-        </Button>
+      <MapToolbar
+        basemap={basemap}
+        onBasemapChange={setBasemap}
+        isTracking={isTrackingRef.current}
+        onToggleTracking={() => isTrackingRef.current ? stopLiveTracking() : startLiveTracking()}
+        isVoiceEnabled={isVoiceEnabled}
+        onToggleVoice={() => setIsVoiceEnabled((v) => !v)}
+        onOpenRouting={() => setIsRoutingModalOpen(true)}
+      />
 
-        <Button
-          type="button"
-          variant={basemap === "satellite" ? "default" : "outline"}
-          size="sm"
-          onClick={() => setBasemap("satellite")}
-          className="gap-2"
-        >
-          <Layers3 className="h-4 w-4" />
-          Satellite
-        </Button>
-      </div>
-
-      <div className="absolute bottom-40 left-4 z-20">
+      <div className="absolute bottom-32 left-4 z-20">
         <Button
           type="button"
           variant="default"
@@ -592,117 +608,38 @@ export default function FeatureMap() {
         </Button>
       </div>
 
-      <div className="absolute right-4 bottom-40 z-20">
+      <div className="absolute right-4 bottom-32 z-20">
         <Button
           type="button"
           size="icon"
           onClick={() => setIsIssueFormOpen(true)}
-          className="bg-green-600 text-white shadow-lg hover:bg-green-700"
+          className="bg-primary text-primary-foreground shadow-lg hover:bg-primary/90"
           title="Report new issue"
         >
           <Plus className="h-5 w-5" />
         </Button>
       </div>
 
-      {isLegendOpen && (
-        <div className="absolute bottom-40 left-16 z-20 max-h-[45vh] w-80 overflow-hidden rounded-2xl bg-white/95 p-3 shadow-xl backdrop-blur dark:bg-slate-900/95">
-          <div className="mb-2 flex items-center justify-between">
-            <div>
-              <h3 className="text-sm font-semibold text-slate-800 dark:text-slate-100">
-                Feature Legend
-              </h3>
-              <span className="text-xs text-slate-500 dark:text-slate-400">
-                {formatLayerCount(featureCount, "feature")}
-              </span>
-            </div>
-
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon"
-              onClick={() => setIsLegendOpen(false)}
-              className="h-7 w-7"
-              title="Close legend"
-            >
-              <X className="h-4 w-4" />
-            </Button>
-          </div>
-
-          <div className="max-h-[35vh] space-y-2 overflow-y-auto pr-1">
-            {legendGroups.length === 0 ? (
-              <p className="rounded-lg bg-slate-100 px-3 py-2 text-xs text-slate-600 dark:bg-slate-800 dark:text-slate-300">
-                No features loaded for this project.
-              </p>
-            ) : (
-              legendGroups.map((group) => {
-                const isHidden = hiddenGroupIds.has(group.id)
-
-                return (
-                  <div
-                    key={group.id}
-                    className="flex items-center justify-between gap-2 rounded-lg bg-slate-100 px-2 py-2 dark:bg-slate-800"
-                  >
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-center gap-2">
-                        <span
-                          className="h-3 w-3 rounded-sm border border-white/60"
-                          style={{
-                            backgroundColor: getFeatureColor(
-                              group.geometryType
-                            ),
-                          }}
-                        />
-                        <p className="truncate text-xs font-medium text-slate-800 dark:text-slate-100">
-                          {group.name}
-                        </p>
-                        <span className="rounded bg-white/70 px-1.5 py-0.5 text-[10px] text-slate-600 dark:bg-slate-700 dark:text-slate-300">
-                          {group.count}
-                        </span>
-                      </div>
-                      <p className="ml-5 text-[11px] text-slate-500 dark:text-slate-400">
-                        {group.geometryType}
-                      </p>
-                    </div>
-
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      onClick={() => toggleGroupVisibility(group.id)}
-                      className="h-7 px-2 text-xs"
-                    >
-                      {isHidden ? (
-                        <>
-                          <Eye className="mr-1 h-3.5 w-3.5" /> Show
-                        </>
-                      ) : (
-                        <>
-                          <EyeOff className="mr-1 h-3.5 w-3.5" /> Hide
-                        </>
-                      )}
-                    </Button>
-                  </div>
-                )
-              })
-            )}
-          </div>
-        </div>
-      )}
+      <MapLegend
+        isOpen={isLegendOpen}
+        onClose={() => setIsLegendOpen(false)}
+        featureCount={featureCount}
+        legendGroups={legendGroups}
+        hiddenGroupIds={hiddenGroupIds}
+        onToggleGroup={toggleGroupVisibility}
+        onColorChange={handleColorChange}
+      />
 
       {(isLoading || errorMessage || !activeProject) && (
-        <div className="absolute right-4 bottom-4 z-10 max-w-md rounded-2xl bg-white/90 p-4 shadow-lg backdrop-blur dark:bg-slate-900/90">
+        <div className="absolute right-4 bottom-4 z-10 max-w-md rounded-2xl bg-card/90 p-4 shadow-lg backdrop-blur">
           {!activeProject ? (
-            <p className="text-sm text-slate-700 dark:text-slate-200">
+            <p className="text-sm text-muted-foreground">
               Select a project to load features and issues on the map.
             </p>
           ) : errorMessage ? (
-            <p className="text-sm text-red-600 dark:text-red-400">
-              {errorMessage}
-            </p>
+            <p className="text-sm text-destructive">{errorMessage}</p>
           ) : (
-            <p className="text-sm text-slate-700 dark:text-slate-200">
-              Loading project map data...
-            </p>
+            <p className="text-sm text-muted-foreground">Loading project map data...</p>
           )}
         </div>
       )}
@@ -710,11 +647,30 @@ export default function FeatureMap() {
       {isIssueFormOpen && (
         <MapTriggeredIssueForm
           onClose={() => setIsIssueFormOpen(false)}
-          onSuccess={() => {
-            setDataReloadKey((previousValue) => previousValue + 1)
-          }}
+          onSuccess={() => setDataReloadKey((v) => v + 1)}
         />
       )}
+
+      <RoutingModal
+        isOpen={isRoutingModalOpen}
+        onClose={() => setIsRoutingModalOpen(false)}
+        onRouteSelect={handleRouteSelect}
+        issues={projectIssues}
+        features={projectFeatures}
+      />
+
+      <DirectionsPanel
+        isOpen={isDirectionsPanelOpen}
+        onClose={() => {
+          setIsDirectionsPanelOpen(false)
+          stopSpeaking()
+          stopLiveTracking()
+        }}
+        steps={routeSteps}
+        totalDistance={routeSummary.distance}
+        totalDuration={routeSummary.duration}
+        currentStepIndex={currentStepIndex}
+      />
 
       {selectedIssue && (
         <IssueDetailsModal

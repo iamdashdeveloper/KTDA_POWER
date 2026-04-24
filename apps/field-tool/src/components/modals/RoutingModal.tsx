@@ -7,13 +7,13 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@workspace/ui/components/dialog"
-import { MapPin, Navigation, Loader, AlertCircle } from "lucide-react"
+import { MapPin, Navigation, Loader, AlertCircle, Search, Layers3 } from "lucide-react"
 import type { Issue } from "@/lib/issueLoader"
+import { parseIssueCoordinates } from "@/lib/mapData"
 
 import * as turf from "@turf/turf"
 import { Label } from "@workspace/ui/components/label"
 import { Checkbox } from "@workspace/ui/components/checkbox"
-import { getFeatureColor } from "../maps/mapUtils"
 
 export type DestinationType = "feature" | "issue" | "parcel"
 
@@ -23,13 +23,7 @@ interface Destination {
   label: string
   id: string
   geometry?: any
-}
-
-interface DestinationGroup {
-  id: string
-  label: string
-  destinations: Destination[]
-  geometryType?: string
+  metadata?: Record<string, any>
 }
 
 interface RoutingModalProps {
@@ -78,6 +72,7 @@ export function RoutingModal({
   const [chainageInterval, setChainageInterval] = useState<string>("100")
   const [chainageValue, setChainageValue] = useState<string>("")
   const [showChainageMarkers, setShowChainageMarkers] = useState<boolean>(false)
+  const [searchQuery, setSearchQuery] = useState("")
 
   const isLineFeature =
     selectedDestination?.geometry?.type === "LineString" ||
@@ -114,10 +109,6 @@ export function RoutingModal({
     )
   }
 
-  const handleSelectDestination = (destination: Destination) => {
-    setSelectedDestination(destination)
-  }
-
   const handleCalculateRoute = async () => {
     if (!startCoordinates || !selectedDestination) {
       return
@@ -132,9 +123,6 @@ export function RoutingModal({
         const val = parseFloat(chainageValue)
         if (!isNaN(val)) {
           try {
-            // turf.along takes distance in kilometers by default or units option
-            // We assume chainage is in meters if not specified, but let's check
-            // Usually chainage is meters.
             const line = selectedDestination.geometry
             const sliced = turf.along(line, val / 1000, { units: "kilometers" })
             finalDestinationCoord = sliced.geometry.coordinates as [
@@ -161,7 +149,6 @@ export function RoutingModal({
             : undefined
         )
       }
-      // Close modal after successful route calculation
       setTimeout(() => {
         onClose()
       }, 500)
@@ -172,102 +159,75 @@ export function RoutingModal({
     }
   }
 
-  const getDestinationOptions = (): Destination[] => {
+  const getFilteredDestinations = (): Destination[] => {
+    let dests: Destination[] = []
+
     switch (selectedDestinationType) {
       case "feature":
-        return features.map((feature) => ({
+        dests = features.map((f) => ({
           type: "feature" as const,
-          coordinates: feature.coordinates,
-          label: feature.name,
-          id: feature.id,
-          geometry: feature.geometry,
+          coordinates: f.coordinates,
+          label: f.name,
+          id: f.id,
+          geometry: f.geometry,
+          metadata: {
+            parent: f.parentName || f.groupName || "-",
+            type: f.geometry?.type || "Unknown"
+          }
         }))
+        break
       case "issue":
-        return issues
+        dests = issues
           .map((issue) => {
-            // Extract coordinates from metadata
-            const meta = issue.metadata as Record<string, any> | undefined
-            if (!meta || !meta.longitude || !meta.latitude) {
-              return null
-            }
+            const coords = parseIssueCoordinates(issue)
+            if (!coords) return null
             return {
               type: "issue" as const,
-              coordinates: [Number(meta.longitude), Number(meta.latitude)] as [
-                number,
-                number,
-              ],
+              coordinates: coords,
               label: issue.title,
               id: issue.id,
+              metadata: {
+                status: issue.status,
+                priority: issue.priority,
+                date: new Date(issue.createdAt).toLocaleDateString(),
+                description: issue.description
+              }
             }
           })
           .filter(Boolean) as Destination[]
+        break
       case "parcel":
-        // TODO: Implement parcel selection when parcels are available
-        return []
-      default:
-        return []
+        dests = [] // TODO
+        break
     }
-  }
 
-  const getDestinationGroups = (): DestinationGroup[] => {
-    const destinations = getDestinationOptions()
+    if (!searchQuery) return dests
 
-    // Group destinations by parent, mirroring FeatureMap legend logic
-    const groupMap = new Map<string, DestinationGroup>()
-
-    destinations.forEach((destination) => {
-      const feature = features.find((f) => f.id === destination.id)
-
-      // For features, use the grouping logic from FeatureMap
-      if (selectedDestinationType === "feature" && feature) {
-        const groupId = feature.parentId || feature.id
-        const groupLabel = feature.groupName || feature.parentName
-
-        if (!groupMap.has(groupId)) {
-          groupMap.set(groupId, {
-            id: groupId,
-            label: groupLabel,
-            destinations: [],
-          })
-        }
-        const group = groupMap.get(groupId)!
-        group.destinations.push(destination)
-      } else {
-        // For issues and parcels, return as a single group
-        if (!groupMap.has("default")) {
-          groupMap.set("default", {
-            id: "default",
-            label: selectedDestinationType === "issue" ? "Issues" : "Parcels",
-            destinations: [],
-          })
-        }
-        const group = groupMap.get("default")!
-        group.destinations.push(destination)
-      }
-    })
-
-    return Array.from(groupMap.values())
+    const query = searchQuery.toLowerCase()
+    return dests.filter(d => 
+      d.label.toLowerCase().includes(query) || 
+      d.id.toLowerCase().includes(query) ||
+      (d.metadata?.parent && d.metadata.parent.toLowerCase().includes(query)) ||
+      (d.metadata?.description && d.metadata.description.toLowerCase().includes(query))
+    )
   }
 
   const isReadyToRoute = startCoordinates && selectedDestination
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-[500px]">
-        <DialogHeader>
+      <DialogContent className="sm:max-w-[800px] max-h-[90vh] flex flex-col p-0 overflow-hidden">
+        <DialogHeader className="p-6 pb-0">
           <div className="flex items-center gap-2">
-            <Navigation className="h-5 w-5" />
+            <Navigation className="h-5 w-5 text-primary" />
             <DialogTitle>Route Navigation</DialogTitle>
           </div>
         </DialogHeader>
 
-        <div className="space-y-6">
+        <div className="flex-1 overflow-y-auto p-6 space-y-6">
           {/* Start Location Section */}
           <div className="space-y-3">
-            <label className="block text-sm font-medium text-foreground">
-              Start Location
-            </label>
-
+            <Label className="text-sm font-medium">Start Location</Label>
             <div className="space-y-2">
               <div className="flex gap-2">
                 <Input
@@ -285,7 +245,6 @@ export function RoutingModal({
                   size="sm"
                   variant="outline"
                   className="gap-2"
-                  title="Get your current location"
                 >
                   {isGeolocating ? (
                     <Loader className="h-4 w-4 animate-spin" />
@@ -304,21 +263,30 @@ export function RoutingModal({
               )}
 
               {startCoordinates && (
-                <p className="text-xs text-muted-foreground">
-                  Coordinates: {startCoordinates[1].toFixed(4)},{" "}
-                  {startCoordinates[0].toFixed(4)}
+                <p className="text-xs text-muted-foreground font-mono">
+                  Coords: {startCoordinates[1].toFixed(6)}, {startCoordinates[0].toFixed(6)}
                 </p>
               )}
             </div>
           </div>
 
-          {/* Destination Type Selector */}
-          <div className="space-y-3">
-            <label className="block text-sm font-medium text-foreground">
-              Destination Type
-            </label>
+          <div className="space-y-4">
+            <div className="flex items-center justify-between gap-4">
+              <Label className="text-sm font-medium">Select Destination</Label>
+              <div className="relative flex-1 max-w-xs">
+                <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                <Input
+                  type="text"
+                  placeholder="Search..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="pl-9 h-9"
+                />
+              </div>
+            </div>
 
-            <div className="grid grid-cols-3 gap-2">
+            {/* Destination Type Tabs */}
+            <div className="flex border-b border-border">
               {(["feature", "issue", "parcel"] as const).map((type) => (
                 <button
                   key={type}
@@ -326,175 +294,117 @@ export function RoutingModal({
                     setSelectedDestinationType(type)
                     setSelectedDestination(null)
                   }}
-                  className={`rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
+                  className={`px-4 py-2 text-sm font-medium transition-colors relative ${
                     selectedDestinationType === type
-                      ? "bg-primary text-primary-foreground"
-                      : "bg-muted text-muted-foreground hover:bg-accent"
+                      ? "text-primary border-b-2 border-primary"
+                      : "text-muted-foreground hover:text-foreground"
                   }`}
                 >
-                  {type.charAt(0).toUpperCase() + type.slice(1)}
+                  {type.charAt(0).toUpperCase() + type.slice(1)}s
                 </button>
               ))}
             </div>
-          </div>
 
-          {/* Destination Selection - Grouped by Parent */}
-          <div className="space-y-3">
-            <label className="block text-sm font-medium text-foreground">
-              Select Destination
-            </label>
-
-            <div className="max-h-48 overflow-y-auto rounded-lg border border-border bg-muted/50 p-2">
-              {getDestinationOptions().length === 0 ? (
-                <p className="p-1 text-sm text-muted-foreground">
-                  No {selectedDestinationType}s available for this project.
-                </p>
-              ) : (
-                <div className="space-y-2">
-                  {getDestinationGroups().map((group) => {
-                    const count = group.destinations.length
-                    const geomType = group.geometryType || "Point"
-                    const swatch = getFeatureColor(geomType, group.id)
-
-                    return (
-                      <div key={group.id} className="rounded-md bg-muted/30">
-                        <div className="flex items-center justify-between gap-2 border-b border-border px-2 py-2">
-                          <div className="flex items-center gap-2">
-                            <div className="relative h-4 w-4">
-                              <span
-                                className="block h-full w-full rounded-sm border border-white/60"
-                                style={{ backgroundColor: swatch }}
-                              />
-                            </div>
-                            <div>
-                              <div className="truncate text-sm font-medium text-foreground">
-                                {group.label || "Unnamed group"}
-                              </div>
-                              <div className="text-[11px] text-muted-foreground">
-                                {geomType} • {count}
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-
-                        <div className="w-full overflow-x-auto">
-                          <table className="w-full table-auto text-sm">
-                            <thead>
-                              <tr className="text-left text-xs text-muted-foreground">
-                                <th className="px-2 py-1">Select</th>
-                                {selectedDestinationType === "feature" && (
-                                  <>
-                                    <th className="px-2 py-1">Coordinates</th>
-                                  </>
-                                )}
-                                {selectedDestinationType === "issue" && (
-                                  <>
-                                    <th className="px-2 py-1">Title</th>
-                                    <th className="px-2 py-1">Date</th>
-                                    <th className="px-2 py-1">Description</th>
-                                    <th className="px-2 py-1">Coordinates</th>
-                                  </>
-                                )}
-                                {selectedDestinationType === "parcel" && (
-                                  <>
-                                    <th className="px-2 py-1">Parcel ID</th>
-                                    <th className="px-2 py-1">Coordinates</th>
-                                  </>
-                                )}
-                              </tr>
-                            </thead>
-                            <tbody>
-                              {group.destinations.map((destination) => {
-                                const issue = issues?.find(
-                                  (i) => i.id === destination.id
-                                )
-                                // feature reference intentionally omitted; grouping already applied
-                                const createdDate = issue?.createdAt
-                                  ? new Date(
-                                      issue.createdAt
-                                    ).toLocaleDateString()
-                                  : ""
-                                const coords = `${destination.coordinates[1].toFixed(4)}, ${destination.coordinates[0].toFixed(4)}`
-                                const isSelected =
-                                  selectedDestination?.id === destination.id
-
-                                return (
-                                  <tr
-                                    key={destination.id}
-                                    className={`cursor-pointer align-top hover:bg-accent ${
-                                      isSelected ? "bg-primary/10" : ""
-                                    }`}
-                                    onClick={() =>
-                                      handleSelectDestination(destination)
-                                    }
-                                  >
-                                    <td className="px-2 py-2">
-                                      <Checkbox
-                                        id={`dest-${destination.id}`}
-                                        checked={isSelected}
-                                        onCheckedChange={(checked) =>
-                                          checked
-                                            ? handleSelectDestination(
-                                                destination
-                                              )
-                                            : setSelectedDestination(null)
-                                        }
-                                      />
-                                    </td>
-
-                                    {selectedDestinationType === "feature" && (
-                                      <>
-                                        <td className="px-2 py-2">{coords}</td>
-                                      </>
-                                    )}
-
-                                    {selectedDestinationType === "issue" && (
-                                      <>
-                                        <td className="px-2 py-2">
-                                          {issue?.title || destination.label}
-                                        </td>
-                                        <td className="px-2 py-2">
-                                          {createdDate}
-                                        </td>
-                                        <td className="line-clamp-1 px-2 py-2 text-muted-foreground">
-                                          {issue?.description || "-"}
-                                        </td>
-                                        <td className="px-2 py-2">{coords}</td>
-                                      </>
-                                    )}
-
-                                    {selectedDestinationType === "parcel" && (
-                                      <>
-                                        <td className="px-2 py-2">
-                                          {destination.id}
-                                        </td>
-                                        <td className="px-2 py-2">{coords}</td>
-                                      </>
-                                    )}
-                                  </tr>
-                                )
-                              })}
-                            </tbody>
-                          </table>
-                        </div>
-                      </div>
-                    )
-                  })}
-                </div>
-              )}
+            {/* Table Area */}
+            <div className="border rounded-lg overflow-hidden bg-card">
+              <div className="max-h-[300px] overflow-y-auto">
+                <table className="w-full text-sm text-left">
+                  <thead className="bg-muted/50 sticky top-0 z-10 border-b">
+                    <tr>
+                      <th className="px-4 py-3 w-12 text-center">Sel</th>
+                      <th className="px-4 py-3 font-medium">Name/Label</th>
+                      {selectedDestinationType === "feature" && (
+                        <>
+                          <th className="px-4 py-3 font-medium">Parent Group</th>
+                          <th className="px-4 py-3 font-medium">Type</th>
+                        </>
+                      )}
+                      {selectedDestinationType === "issue" && (
+                        <>
+                          <th className="px-4 py-3 font-medium">Status</th>
+                          <th className="px-4 py-3 font-medium">Priority</th>
+                          <th className="px-4 py-3 font-medium">Date</th>
+                        </>
+                      )}
+                      <th className="px-4 py-3 font-medium">Coordinates</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y">
+                    {getFilteredDestinations().length === 0 ? (
+                      <tr>
+                        <td colSpan={5} className="px-4 py-8 text-center text-muted-foreground italic">
+                          No {selectedDestinationType}s found matching your search.
+                        </td>
+                      </tr>
+                    ) : (
+                      getFilteredDestinations().map((dest) => (
+                        <tr 
+                          key={dest.id}
+                          className={`hover:bg-accent/50 cursor-pointer transition-colors ${
+                            selectedDestination?.id === dest.id ? "bg-primary/5" : ""
+                          }`}
+                          onClick={() => setSelectedDestination(dest)}
+                        >
+                          <td className="px-4 py-3 text-center" onClick={(e) => e.stopPropagation()}>
+                            <Checkbox 
+                              checked={selectedDestination?.id === dest.id}
+                              onCheckedChange={(checked) => {
+                                setSelectedDestination(checked ? dest : null)
+                              }}
+                            />
+                          </td>
+                          <td className="px-4 py-3 font-medium">
+                            {dest.label}
+                            {selectedDestinationType === "issue" && dest.metadata?.description && (
+                              <p className="text-xs text-muted-foreground font-normal line-clamp-1 mt-0.5">
+                                {dest.metadata.description}
+                              </p>
+                            )}
+                          </td>
+                          {selectedDestinationType === "feature" && (
+                            <>
+                              <td className="px-4 py-3 text-muted-foreground">{dest.metadata?.parent}</td>
+                              <td className="px-4 py-3 text-muted-foreground italic text-xs">{dest.metadata?.type}</td>
+                            </>
+                          )}
+                          {selectedDestinationType === "issue" && (
+                            <>
+                              <td className="px-4 py-3">
+                                <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold uppercase ${
+                                  dest.metadata?.status === "OPEN" ? "bg-red-100 text-red-700" :
+                                  dest.metadata?.status === "IN_PROGRESS" ? "bg-orange-100 text-orange-700" :
+                                  "bg-green-100 text-green-700"
+                                }`}>
+                                  {dest.metadata?.status}
+                                </span>
+                              </td>
+                              <td className="px-4 py-3">{dest.metadata?.priority}</td>
+                              <td className="px-4 py-3 text-muted-foreground">{dest.metadata?.date}</td>
+                            </>
+                          )}
+                          <td className="px-4 py-3 font-mono text-[11px] text-muted-foreground whitespace-nowrap">
+                            {dest.coordinates[1].toFixed(5)}, {dest.coordinates[0].toFixed(5)}
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
             </div>
           </div>
 
           {/* Chainage Options for Line Features */}
           {selectedDestinationType === "feature" && isLineFeature && (
-            <div className="space-y-4 rounded-lg border border-border bg-muted/30 p-3">
-              <div className="text-sm font-semibold text-foreground">
+            <div className="space-y-4 rounded-xl border border-primary/20 bg-primary/5 p-4 animate-in fade-in slide-in-from-top-2 duration-300">
+              <div className="flex items-center gap-2 text-sm font-semibold text-primary">
+                <Layers3 className="h-4 w-4" />
                 Line Feature Options (Chainage)
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-1.5">
-                  <Label htmlFor="chainageInterval" className="text-xs">
+                  <Label htmlFor="chainageInterval" className="text-xs font-medium">
                     Chainage Interval (m)
                   </Label>
                   <Input
@@ -503,11 +413,11 @@ export function RoutingModal({
                     placeholder="e.g. 100"
                     value={chainageInterval}
                     onChange={(e) => setChainageInterval(e.target.value)}
-                    className="h-8"
+                    className="h-9 bg-background"
                   />
                 </div>
                 <div className="space-y-1.5">
-                  <Label htmlFor="chainageValue" className="text-xs">
+                  <Label htmlFor="chainageValue" className="text-xs font-medium">
                     Chainage Value (m)
                   </Label>
                   <Input
@@ -516,58 +426,56 @@ export function RoutingModal({
                     placeholder="e.g. 500"
                     value={chainageValue}
                     onChange={(e) => setChainageValue(e.target.value)}
-                    className="h-8"
+                    className="h-9 bg-background"
                   />
                 </div>
               </div>
 
-              <div className="flex items-center space-x-2">
+              <div className="flex items-center space-x-2 pt-1">
                 <Checkbox
                   id="showChainageMarkers"
                   checked={showChainageMarkers}
-                  onCheckedChange={(checked) =>
-                    setShowChainageMarkers(!!checked)
-                  }
+                  onCheckedChange={(checked) => setShowChainageMarkers(!!checked)}
                 />
                 <Label
                   htmlFor="showChainageMarkers"
-                  className="text-xs leading-none font-medium peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                  className="text-xs font-medium cursor-pointer leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
                 >
-                  Show chainage markers
+                  Show chainage markers along the entire line
                 </Label>
               </div>
             </div>
           )}
+        </div>
 
-          {/* Action Buttons */}
-          <div className="flex gap-3 pt-4">
-            <Button
-              type="button"
-              variant="outline"
-              onClick={onClose}
-              className="flex-1"
-            >
-              Cancel
-            </Button>
-            <Button
-              type="button"
-              onClick={handleCalculateRoute}
-              disabled={!isReadyToRoute || isCalculatingRoute}
-              className="flex-1 gap-2"
-            >
-              {isCalculatingRoute ? (
-                <>
-                  <Loader className="h-4 w-4 animate-spin" />
-                  Calculating...
-                </>
-              ) : (
-                <>
-                  <Navigation className="h-4 w-4" />
-                  Get Directions
-                </>
-              )}
-            </Button>
-          </div>
+        {/* Footer */}
+        <div className="p-6 border-t bg-muted/30 flex gap-3">
+          <Button
+            type="button"
+            variant="ghost"
+            onClick={onClose}
+            className="flex-1"
+          >
+            Cancel
+          </Button>
+          <Button
+            type="button"
+            onClick={handleCalculateRoute}
+            disabled={!isReadyToRoute || isCalculatingRoute}
+            className="flex-1 gap-2 shadow-lg"
+          >
+            {isCalculatingRoute ? (
+              <>
+                <Loader className="h-4 w-4 animate-spin" />
+                Calculating...
+              </>
+            ) : (
+              <>
+                <Navigation className="h-4 w-4" />
+                Get Directions
+              </>
+            )}
+          </Button>
         </div>
       </DialogContent>
     </Dialog>

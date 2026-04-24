@@ -3,7 +3,7 @@ import Fill from "ol/style/Fill"
 import Stroke from "ol/style/Stroke"
 import CircleStyle from "ol/style/Circle"
 import Text from "ol/style/Text"
-import { getThemeColor, getFeatureColor } from "./mapUtils"
+import { getFeatureColor } from "./mapUtils"
 
 export function featureStyleFunction(feature: any) {
   const geometry = feature.getGeometry()
@@ -15,7 +15,7 @@ export function featureStyleFunction(feature: any) {
       image: new CircleStyle({
         radius: 6,
         fill: new Fill({ color: getFeatureColor(geometryType, groupId) }),
-        stroke: new Stroke({ color: getThemeColor("--background"), width: 2 }),
+        stroke: new Stroke({ color: "#ffffff", width: 2 }),
       }),
     })
   }
@@ -30,7 +30,7 @@ export function featureStyleFunction(feature: any) {
   }
 
   return new Style({
-    fill: new Fill({ color: getFeatureColor(geometryType, groupId) + "26" }), // Adding alpha for fill
+    fill: new Fill({ color: getFeatureColor(geometryType, groupId, 0.15) }),
     stroke: new Stroke({
       color: getFeatureColor(geometryType, groupId),
       width: 2,
@@ -43,11 +43,11 @@ export function issueStyleFunction(feature: any) {
   const priority = Number(feature.get("priority") || 0)
 
   const palette: Record<string, { fill: string; stroke: string }> = {
-    OPEN: { fill: "oklch(0.577 0.245 27.325 / 0.95)", stroke: "oklch(0.35 0.15 27)" },
-    IN_PROGRESS: { fill: "oklch(0.7 0.2 60 / 0.95)", stroke: "oklch(0.5 0.15 60)" },
-    ON_HOLD: { fill: "oklch(0.6 0.2 300 / 0.95)", stroke: "oklch(0.4 0.15 300)" },
-    RESOLVED: { fill: "oklch(0.7 0.2 150 / 0.95)", stroke: "oklch(0.5 0.15 150)" },
-    CLOSED: { fill: getThemeColor("--muted", 0.95), stroke: getThemeColor("--muted-foreground") },
+    OPEN: { fill: "rgba(217, 70, 39, 0.95)", stroke: "rgba(153, 51, 25, 1)" },
+    IN_PROGRESS: { fill: "rgba(217, 119, 6, 0.95)", stroke: "rgba(180, 83, 9, 1)" },
+    ON_HOLD: { fill: "rgba(168, 85, 247, 0.95)", stroke: "rgba(126, 34, 206, 1)" },
+    RESOLVED: { fill: "rgba(34, 197, 94, 0.95)", stroke: "rgba(22, 163, 74, 1)" },
+    CLOSED: { fill: "rgba(107, 114, 128, 0.95)", stroke: "rgba(75, 85, 99, 1)" },
   }
 
   const colors = palette[status] || palette.OPEN
@@ -57,11 +57,11 @@ export function issueStyleFunction(feature: any) {
     image: new CircleStyle({
       radius,
       fill: new Fill({ color: colors.fill }),
-      stroke: new Stroke({ color: getThemeColor("--background"), width: 2 }),
+      stroke: new Stroke({ color: "#ffffff", width: 2 }),
     }),
     text: new Text({
       text: "!",
-      fill: new Fill({ color: getThemeColor("--background") }),
+      fill: new Fill({ color: "#ffffff" }),
       stroke: new Stroke({ color: "rgba(0,0,0,0.35)", width: 3 }),
       font: "800 11px Inter, Arial, sans-serif",
       offsetY: 0,

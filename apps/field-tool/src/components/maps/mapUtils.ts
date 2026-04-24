@@ -222,29 +222,66 @@ export function formatLayerCount(count: number, label: string) {
 export function getThemeColor(variable: string = "--primary", opacity: number = 1): string {
   if (typeof window === "undefined") return "rgba(0,0,0,0)"
 
+  // If variable looks like it's already a complete color (hex, rgb, oklch, hsl), return it as-is
+  if (variable.startsWith("#") || variable.startsWith("rgb") || variable.startsWith("oklch") || variable.startsWith("hsl")) {
+    if (opacity < 1 && variable.startsWith("#")) {
+      // For hex colors with opacity, convert to rgba
+      const hex = variable.slice(1)
+      const r = parseInt(hex.slice(0, 2), 16)
+      const g = parseInt(hex.slice(2, 4), 16)
+      const b = parseInt(hex.slice(4, 6), 16)
+      return `rgba(${r}, ${g}, ${b}, ${opacity})`
+    }
+    return variable
+  }
+
   const value = getComputedStyle(document.documentElement).getPropertyValue(variable).trim()
   if (!value) return "rgba(0,0,0,1)" // Fallback if variable is missing
 
+  // Check if value is already wrapped in oklch() or other color function
+  if (value.startsWith("oklch(") || value.startsWith("rgb(") || value.startsWith("hsl(")) {
+    // Already wrapped - replace opacity or add it
+    if (value.includes("/")) {
+      // Already has opacity, replace it
+      return value.replace(/\/\s*[\d.]+\s*\)/, `/ ${opacity})`)
+    } else if (value.endsWith(")")) {
+      // Add opacity
+      return value.slice(0, -1) + ` / ${opacity})`
+    }
+    return value
+  }
+
+  // Value is just the oklch components (e.g., "0.5 0.1 200")
   return `oklch(${value} / ${opacity})`
 }
 
-export function getFeatureColor(geometryType: string, layerId?: string): string {
+export function getFeatureColor(geometryType: string, layerId?: string, opacity: number = 1): string {
   // Check for stored override first
   if (layerId) {
     const storedColors = getStoredLayerColors()
     if (storedColors[layerId]) {
-      return storedColors[layerId]
+      const baseColor = storedColors[layerId]
+      // If baseColor is hex, convert to rgba with opacity if needed
+      if (baseColor.startsWith("#") && opacity < 1) {
+        const hex = baseColor.slice(1)
+        const r = parseInt(hex.slice(0, 2), 16)
+        const g = parseInt(hex.slice(2, 4), 16)
+        const b = parseInt(hex.slice(4, 6), 16)
+        return `rgba(${r}, ${g}, ${b}, ${opacity})`
+      }
+      return baseColor
     }
   }
 
+  // Default colors - no theme variables, just simple colors
   if (geometryType === "Point" || geometryType === "MultiPoint") {
-    return getThemeColor("--primary")
+    return `rgba(59, 130, 246, ${opacity})`  // blue
   }
 
   if (geometryType === "LineString" || geometryType === "MultiLineString") {
-    return getThemeColor("--primary", 0.8)
+    return `rgba(34, 197, 94, ${opacity * 0.8})`  // green
   }
 
-  return getThemeColor("--primary", 0.9)
+  return `rgba(168, 85, 247, ${opacity * 0.9})`  // purple
 }
 

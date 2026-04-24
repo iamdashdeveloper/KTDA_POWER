@@ -76,6 +76,7 @@ export function DirectionsPanel({
   const [isDragging, setIsDragging] = useState(false)
   const startY = useRef(0)
   const startHeight = useRef(0)
+  const heightRef = useRef(DEFAULT_HEIGHT)
 
   const maxHeight =
     typeof window !== "undefined"
@@ -88,7 +89,7 @@ export function DirectionsPanel({
       startY.current = clientY
       startHeight.current = height
     },
-    [height]
+    []
   )
 
   const onDragMove = useCallback(
@@ -106,9 +107,14 @@ export function DirectionsPanel({
 
   const onDragEnd = useCallback(() => {
     setIsDragging(false)
-    if (height < MIN_HEIGHT + 40) {
+    if (heightRef.current < MIN_HEIGHT + 40) {
       setHeight(MIN_HEIGHT)
     }
+  }, [])
+
+  // Keep heightRef in sync with height state
+  useEffect(() => {
+    heightRef.current = height
   }, [height])
 
   useEffect(() => {

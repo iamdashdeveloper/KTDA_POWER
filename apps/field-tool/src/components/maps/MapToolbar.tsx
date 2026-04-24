@@ -29,7 +29,7 @@ export function MapToolbar({
   onOpenRouting,
 }: MapToolbarProps) {
   return (
-    <div className="absolute top-4 left-4 z-10 flex max-w-[calc(100%-2rem)] flex-wrap items-center gap-3 rounded-2xl bg-card/90 p-2 shadow-lg backdrop-blur">
+    <div className="absolute top-20 left-4 z-10 flex max-w-[calc(100%-2rem)] flex-wrap items-center gap-3 rounded-2xl bg-card/90 p-2 shadow-lg backdrop-blur">
       <Button
         type="button"
         variant={basemap === "osm" ? "default" : "outline"}
