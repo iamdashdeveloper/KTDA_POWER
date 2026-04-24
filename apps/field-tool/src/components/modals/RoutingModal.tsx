@@ -1,4 +1,4 @@
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Button } from "@workspace/ui/components/button"
 import { Input } from "@workspace/ui/components/input"
 import {
@@ -77,6 +77,20 @@ export function RoutingModal({
   const isLineFeature =
     selectedDestination?.geometry?.type === "LineString" ||
     selectedDestination?.geometry?.type === "MultiLineString"
+
+  // Log features and issues when modal opens
+  useEffect(() => {
+    if (isOpen) {
+      console.log("[RoutingModal] Features loaded:", {
+        count: features.length,
+        objects: features
+      })
+      console.log("[RoutingModal] Issues loaded:", {
+        count: issues.length,
+        objects: issues
+      })
+    }
+  }, [isOpen, features, issues])
 
   const handleGetCurrentLocation = () => {
     if (!navigator.geolocation) {
@@ -337,7 +351,8 @@ export function RoutingModal({
                         </td>
                       </tr>
                     ) : (
-                      getFilteredDestinations().map((dest) => (
+                        getFilteredDestinations().map((dest) => (
+                        
                         <tr 
                           key={dest.id}
                           className={`hover:bg-accent/50 cursor-pointer transition-colors ${
@@ -350,6 +365,7 @@ export function RoutingModal({
                               checked={selectedDestination?.id === dest.id}
                               onCheckedChange={(checked) => {
                                 setSelectedDestination(checked ? dest : null)
+                                
                               }}
                             />
                           </td>

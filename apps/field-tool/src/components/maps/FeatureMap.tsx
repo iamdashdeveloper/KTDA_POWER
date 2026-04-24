@@ -459,6 +459,14 @@ export default function FeatureMap() {
           loadProjectIssues(projectId),
         ])
         console.log(`[FeatureMap] Loaded ${featuresData?.length || 0} features and ${issuesData?.length || 0} issues`)
+        console.log("[FeatureMap] Features data:", {
+          count: featuresData?.length || 0,
+          objects: featuresData
+        })
+        console.log("[FeatureMap] Issues data:", {
+          count: issuesData?.length || 0,
+          objects: issuesData
+        })
 
         if (cancelled) return
 
@@ -494,6 +502,10 @@ export default function FeatureMap() {
         }).filter(Boolean) as typeof projectFeatures
 
         setProjectFeatures(routingFeatures)
+        console.log("[FeatureMap] Routing features prepared:", {
+          count: routingFeatures.length,
+          objects: routingFeatures
+        })
 
         // Render features on map
         const featureCollection = {
