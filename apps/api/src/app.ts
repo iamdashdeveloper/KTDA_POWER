@@ -44,7 +44,7 @@ export async function createApp() {
 
   // Register plugins
   await fastify.register(cors, {
-    origin: env.CORS_ORIGIN,
+    origin: env.CORS_ORIGIN.split(","),
     methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     credentials: true,
   })

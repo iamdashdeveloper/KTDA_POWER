@@ -27,7 +27,7 @@ export const env = {
   JWT_EXPIRATION: getEnv("JWT_EXPIRATION", "7d"),
 
   // CORS
-  CORS_ORIGIN: getEnv("CORS_ORIGIN", "http://localhost:5173"),
+  CORS_ORIGIN: getEnv("CORS_ORIGIN", "http://localhost:5173,http://localhost:5175"),
 }
 
 export default env

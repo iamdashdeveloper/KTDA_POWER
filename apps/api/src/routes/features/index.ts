@@ -488,6 +488,7 @@ export async function featuresRoutes(fastify: FastifyInstance) {
         if (name !== undefined) updateData.name = name
         if (details !== undefined) updateData.details = details
         if (parentId !== undefined) updateData.parentId = parentId
+        if (projectId !== undefined) updateData.projectId = projectId
 
         const feature = await fastify.prisma.feature.update({
           where: { id: request.params.id },

@@ -9,8 +9,8 @@
 @custom-variant dark (&:is(.dark *));
 
 /* Source paths stay the same to catch your components */
-@source "../../../apps/**/*.{ts,tsx}";
-@source "../../../components/**/*.{ts,tsx}";
+@source "../../../../apps/**/*.{ts,tsx}";
+@source "../../../../packages/**/*.{ts,tsx}";
 @source "../**/*.{ts,tsx}";
 
 @theme inline {
