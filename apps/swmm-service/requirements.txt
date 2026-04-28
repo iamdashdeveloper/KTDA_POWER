@@ -1,0 +1,5 @@
+fastapi
+uvicorn[standard]
+pyswmm
+swmm-api
+pandas  # Highly recommended for handling SWMM output data

@@ -1,6 +1,5 @@
 services:
   db:
-    # CHANGE THIS LINE:
     image: postgis/postgis:16-3.4-alpine
     container_name: ktpc-db
     restart: always
@@ -11,7 +10,26 @@ services:
     ports:
       - "5435:5432"
     volumes:
-      - postgres_data:/var/lib/postgresql/data # Fixed path from your previous snippet
+      - postgres_data:/var/lib/postgresql/data
+
+  swmm-service:
+    build: 
+      context: ./apps/swmm-service
+      dockerfile: Dockerfile
+    container_name: swmm-service
+    restart: always
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./apps/swmm-service:/app  # <--- THIS maps your local code to the container's /app
+    depends_on:
+      - db
+    environment:
+      - DB_HOST=db
+      - DB_PORT=5432
+      - DB_USER=admin
+      - DB_PASSWORD=postgres
+      - DB_NAME=ktpch
 
 volumes:
   postgres_data:
