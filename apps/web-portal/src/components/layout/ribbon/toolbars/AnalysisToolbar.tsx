@@ -1,4 +1,4 @@
-import React from "react"
+import React, { useState } from "react"
 import {
   Mountain,
   Cpu,
@@ -12,12 +12,16 @@ import {
   Globe,
   Map as MapIcon,
   ChevronRight,
+  Box,
 } from "lucide-react"
 import { RibbonGroup } from "../RibbonGroup"
 import { RibbonButton } from "../RibbonButton"
 import { RibbonSmallButton } from "../RibbonSmallButton"
 import { useMapStore } from "@/store/useMapStore"
+import { useHydroModelStore } from "@/store/useHydroModelStore"
 import { RibbonSeparator } from "../RibbonSeparator"
+import { CreateHydroModelModal } from "../../../modals/CreateHydroModelModal"
+import { LoadHydroModelModal } from "../../../modals/LoadHydroModelModal"
 
 interface AnalysisToolbarProps {
   onToolClick: (toolId: string) => void
@@ -27,6 +31,9 @@ export const AnalysisToolbar: React.FC<AnalysisToolbarProps> = ({
   onToolClick,
 }) => {
   const { viewMode, setViewMode, executeTerrainCommand } = useMapStore()
+  const { addTab } = useHydroModelStore()
+  const [isCreateHydroModelOpen, setIsCreateHydroModelOpen] = useState(false)
+  const [isLoadHydroModelOpen, setIsLoadHydroModelOpen] = useState(false)
 
   const is3D = viewMode === "TERRAIN_3D"
 
@@ -132,12 +139,60 @@ export const AnalysisToolbar: React.FC<AnalysisToolbarProps> = ({
           label="Sensors"
           onClick={() => onToolClick("sensors")}
         />
-        <RibbonSmallButton
-          icon={<AlertTriangle size={14} />}
-          label="Flood Prediction"
-          onClick={() => onToolClick("flood-prediction")}
-        />
+        <div className="ml-1 flex flex-col justify-center gap-1 border-l border-border/50 pl-2">
+          <RibbonSmallButton
+            icon={<AlertTriangle size={14} />}
+            label="Flood Prediction"
+            onClick={() => onToolClick("flood-prediction")}
+          />
+          <RibbonSmallButton
+            icon={<Box size={14} />}
+            label="Create Model"
+            onClick={() => {
+              console.log("[AnalysisToolbar] Create Model clicked")
+              setIsCreateHydroModelOpen(true)
+            }}
+          />
+          <RibbonSmallButton
+            icon={<Box size={14} />}
+            label="Load Model"
+            onClick={() => {
+              console.log("[AnalysisToolbar] Load Model clicked")
+              setIsLoadHydroModelOpen(true)
+            }}
+          />
+        </div>
       </RibbonGroup>
+
+      <CreateHydroModelModal
+        isOpen={isCreateHydroModelOpen}
+        onClose={() => {
+          console.log("[AnalysisToolbar] CreateHydroModelModal closed")
+          setIsCreateHydroModelOpen(false)
+        }}
+        onSuccess={(modelId, modelName) => {
+          console.log("[AnalysisToolbar] CreateHydroModelModal onSuccess:", {
+            modelId,
+            modelName,
+          })
+          addTab(modelId, modelName)
+        }}
+      />
+
+      <LoadHydroModelModal
+        isOpen={isLoadHydroModelOpen}
+        onClose={() => {
+          console.log("[AnalysisToolbar] LoadHydroModelModal closed")
+          setIsLoadHydroModelOpen(false)
+        }}
+        onSuccess={(modelId, modelName) => {
+          console.log("[AnalysisToolbar] LoadHydroModelModal onSuccess:", {
+            modelId,
+            modelName,
+          })
+          addTab(modelId, modelName)
+        }}
+      />
     </div>
   )
 }

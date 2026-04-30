@@ -92,9 +92,9 @@ model Project {
   activities  Activity[]
   articles    Article[]
   chatRooms   ChatRoom[]
+  complaints  Complaint[]
   issues      Issue[]
   columns     KanbanColumn[]
-  complaints  Complaint[]
   company     Company                  @relation(fields: [companyId], references: [id])
   members     ProjectMember[]
 }
@@ -285,45 +285,45 @@ model Article {
 }
 
 model GuraCadastre {
-  ogc_fid    Int                      @id @default(autoincrement()) @map("ogc_fid")
-  geom       Unsupported("geometry")?
-  entity     String?                  @db.VarChar(16)
-  handle     String?                  @db.VarChar(16)
-  layer      String?                  @db.VarChar(254)
-  lyrfrzn    String?                  @db.VarChar(5)
-  lyrlock    String?                  @db.VarChar(5)
-  lyron      String?                  @db.VarChar(5)
-  lyrvpfrzn  String?                  @db.VarChar(5)
-  lyrhandle  String?                  @db.VarChar(16)
-  color      String?                  @db.VarChar(5)
-  entcolor   String?                  @db.VarChar(5)
-  lyrcolor   String?                  @db.VarChar(5)
-  blkcolor   String?                  @db.VarChar(5)
-  linetype   String?                  @db.VarChar(254)
-  entlinetyp String?                  @db.VarChar(254)
-  lyrlntype  String?                  @db.VarChar(254)
-  blklinetyp String?                  @db.VarChar(254)
-  ltscale    String?                  @db.VarChar(19)
-  elevation  String?                  @db.VarChar(19)
-  thickness  String?                  @db.VarChar(19)
-  linewt     String?                  @db.VarChar(5)
-  entlinewt  String?                  @db.VarChar(5)
-  lyrlinewt  String?                  @db.VarChar(5)
-  blklinewt  String?                  @db.VarChar(5)
-  refname    String?                  @db.VarChar(254)
-  extx       String?                  @db.VarChar(19)
-  exty       String?                  @db.VarChar(19)
-  extz       String?                  @db.VarChar(19)
-  docname    String?                  @db.VarChar(254)
-  docpath    String?                  @db.VarChar(254)
-  doctype    String?                  @db.VarChar(32)
-  docver     String?                  @db.VarChar(16)
-  docupdate  String?                  @db.VarChar(10)
-  docid      String?                  @db.VarChar(19)
-  globalwidt String?                  @db.VarChar(19)
-  shape_leng String?                  @db.VarChar(19)
+  id         Int                      @id @default(autoincrement())
+  geometry   Unsupported("geometry")?
+  entity     String?                  @db.VarChar
+  handle     String?                  @db.VarChar
+  layer      String?                  @db.VarChar
+  lyrfrzn    String?                  @db.VarChar
+  lyrlock    String?                  @db.VarChar
+  lyron      String?                  @db.VarChar
+  lyrvpfrzn  String?                  @db.VarChar
+  lyrhandle  String?                  @db.VarChar
+  color      String?                  @db.VarChar
+  entcolor   String?                  @db.VarChar
+  lyrcolor   String?                  @db.VarChar
+  blkcolor   String?                  @db.VarChar
+  linetype   String?                  @db.VarChar
+  entlinetyp String?                  @db.VarChar
+  lyrlntype  String?                  @db.VarChar
+  blklinetyp String?                  @db.VarChar
+  ltscale    String?                  @db.VarChar
+  elevation  String?                  @db.VarChar
+  thickness  String?                  @db.VarChar
+  linewt     String?                  @db.VarChar
+  entlinewt  String?                  @db.VarChar
+  lyrlinewt  String?                  @db.VarChar
+  blklinewt  String?                  @db.VarChar
+  refname    String?                  @db.VarChar
+  extx       String?                  @db.VarChar
+  exty       String?                  @db.VarChar
+  extz       String?                  @db.VarChar
+  docname    String?                  @db.VarChar
+  docpath    String?                  @db.VarChar
+  doctype    String?                  @db.VarChar
+  docver     String?                  @db.VarChar
+  docupdate  String?                  @db.VarChar
+  docid      String?                  @db.VarChar
+  globalwidt String?                  @db.VarChar
+  shape_leng String?                  @db.VarChar
 
-  @@index([geom], map: "gura_cadastre_geom_geom_idx", type: Gist)
+  @@index([geometry], map: "gura_cadastre_geometry_geom_idx", type: Gist)
   @@map("gura_cadastre")
 }
 
@@ -358,24 +358,24 @@ model Parcel {
 }
 
 model Complaint {
-  id                 String                   @id @default(cuid())
-  parcelId           String
-  ownerId            String
-  phoneNumber        String
-  complaintType      String
-  description        String
-  plotNumber         String?
-  name               String
-  projectId          String?
-  severity           String                   @default("medium")
-  status             String                   @default("open")
-  metadata           Json                     @default("{}")
-  createdAt          DateTime                 @default(now())
-  updatedAt          DateTime                 @updatedAt
-  owner              Owner                    @relation(fields: [ownerId], references: [id], onDelete: Cascade)
-  parcel             Parcel                   @relation(fields: [parcelId], references: [id], onDelete: Cascade)
-  project            Project?                 @relation(fields: [projectId], references: [id], onDelete: SetNull)
-  feedbacks          Feedback[]
+  id            String     @id @default(cuid())
+  complaintType String
+  description   String
+  severity      String     @default("medium")
+  status        String     @default("open")
+  metadata      Json       @default("{}")
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
+  name          String
+  phoneNumber   String
+  plotNumber    String?
+  projectId     String?
+  ownerId       String
+  parcelId      String
+  owner         Owner      @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  parcel        Parcel     @relation(fields: [parcelId], references: [id], onDelete: Cascade)
+  project       Project?   @relation(fields: [projectId], references: [id])
+  feedbacks     Feedback[]
 }
 
 model Feedback {
@@ -401,4 +401,27 @@ model spatial_ref_sys {
   auth_srid Int?
   srtext    String? @db.VarChar(2048)
   proj4text String? @db.VarChar(2048)
+}
+model HydroModel {
+  id            String        @id @default(uuid()) @db.Uuid
+  name          String
+  description   String?
+  parentModelId String?       @db.Uuid
+  objects       HydroObject[]
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  @@map("hydro_models")
+}
+
+model HydroObject {
+  id        String     @id @default(uuid()) @db.Uuid
+  modelId   String     @db.Uuid
+  model     HydroModel @relation(fields: [modelId], references: [id], onDelete: Cascade)
+  name      String
+  type      String     
+  data      Json       @default("{}")
+
+  @@unique([modelId, name])
+  @@map("hydro_objects")
 }

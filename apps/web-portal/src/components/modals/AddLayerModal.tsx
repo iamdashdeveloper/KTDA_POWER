@@ -1,53 +1,55 @@
-import React, { useEffect, useRef, useState } from "react";
-import { 
-  Dialog, 
-  DialogContent, 
-  DialogHeader, 
-  DialogTitle, 
+import React, { useEffect, useRef, useState } from "react"
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
   DialogDescription,
-  DialogFooter
-} from "@workspace/ui/components/dialog";
-import { Button } from "@workspace/ui/components/button";
-import { Textarea } from "@workspace/ui/components/textarea";
+  DialogFooter,
+} from "@workspace/ui/components/dialog"
+import { Button } from "@workspace/ui/components/button"
+import { Input } from "@workspace/ui/components/input"
+import { Textarea } from "@workspace/ui/components/textarea"
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "@workspace/ui/components/select";
-import { toast } from "sonner";
-import { Upload, X, FileJson, MapPin, Loader2 } from "lucide-react";
-import { ApiClient } from "@/lib/api";
-import { useProjectStore } from "@/store/useProjectStore";
-import { useMapStore } from "@/store/useMapStore";
+} from "@workspace/ui/components/select"
+import { toast } from "sonner"
+import { Upload, X, FileJson, MapPin, Loader2 } from "lucide-react"
+import { ApiClient } from "@/lib/api"
+import { useProjectStore } from "@/store/useProjectStore"
+import { useMapStore } from "@/store/useMapStore"
 
 interface AddLayerModalProps {
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
+  open: boolean
+  onOpenChange: (open: boolean) => void
 }
 
 interface ProjectOption {
-  id: string;
-  name: string;
+  id: string
+  name: string
 }
 
 export const AddLayerModal: React.FC<AddLayerModalProps> = ({
   open,
   onOpenChange,
 }) => {
-  const { activeProject } = useProjectStore();
-  const { triggerRefresh } = useMapStore();
-  
-  const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  const [uploadLoading, setUploadLoading] = useState(false);
-  const [dragActive, setDragActive] = useState(false);
-  const [details, setDetails] = useState("");
-  const [projects, setProjects] = useState<ProjectOption[]>([]);
-  const [projectsLoading, setProjectsLoading] = useState(false);
-  const [selectedProjectId, setSelectedProjectId] = useState("");
-  const [associateWithProject, setAssociateWithProject] = useState(true);
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  const { activeProject } = useProjectStore()
+  const { triggerRefresh } = useMapStore()
+
+  const [selectedFile, setSelectedFile] = useState<File | null>(null)
+  const [uploadLoading, setUploadLoading] = useState(false)
+  const [dragActive, setDragActive] = useState(false)
+  const [name, setName] = useState("")
+  const [details, setDetails] = useState("")
+  const [projects, setProjects] = useState<ProjectOption[]>([])
+  const [projectsLoading, setProjectsLoading] = useState(false)
+  const [selectedProjectId, setSelectedProjectId] = useState("")
+  const [associateWithProject, setAssociateWithProject] = useState(true)
+  const fileInputRef = useRef<HTMLInputElement>(null)
 
   const acceptedFileTypes = [
     "application/vnd.google-earth.kml+xml",
@@ -55,173 +57,188 @@ export const AddLayerModal: React.FC<AddLayerModalProps> = ({
     "application/json",
     "application/geo+json",
     "application/x-kmz",
-  ];
+  ]
 
   useEffect(() => {
-    if (!open) return;
+    if (!open) return
 
     // Default to active project if available
     if (activeProject) {
-      setSelectedProjectId(activeProject.id);
+      setSelectedProjectId(activeProject.id)
     }
 
     const fetchProjects = async () => {
       try {
-        setProjectsLoading(true);
-        const response = await ApiClient.get<ProjectOption[]>("/projects");
-        setProjects(response);
+        setProjectsLoading(true)
+        const response = await ApiClient.get<ProjectOption[]>("/projects")
+        setProjects(response)
       } catch (error) {
-        console.error("Error fetching projects:", error);
-        toast.error("Failed to load projects");
+        console.error("Error fetching projects:", error)
+        toast.error("Failed to load projects")
       } finally {
-        setProjectsLoading(false);
+        setProjectsLoading(false)
       }
-    };
+    }
 
-    fetchProjects();
-  }, [open, activeProject]);
+    fetchProjects()
+  }, [open, activeProject])
 
   const isValidFile = (file: File) => {
     return (
       acceptedFileTypes.includes(file.type) ||
       /\.(kml|kmz|geojson|json)$/i.test(file.name)
-    );
-  };
+    )
+  }
 
   const handleFileSelect = (file: File | null) => {
-    if (!file) return;
+    if (!file) return
 
     if (!isValidFile(file)) {
       toast.error("Invalid file type", {
         description: "Please upload KML, KMZ, or GeoJSON files",
-      });
-      return;
+      })
+      return
     }
 
     if (file.size > 50 * 1024 * 1024) {
       toast.error("File too large", {
         description: "Maximum file size is 50 MB",
-      });
-      return;
+      })
+      return
     }
 
-    setSelectedFile(file);
-  };
+    setSelectedFile(file)
+  }
 
   const handleDrag = (e: React.DragEvent<HTMLDivElement>) => {
-    e.preventDefault();
-    e.stopPropagation();
+    e.preventDefault()
+    e.stopPropagation()
     if (e.type === "dragenter" || e.type === "dragover") {
-      setDragActive(true);
+      setDragActive(true)
     } else if (e.type === "dragleave") {
-      setDragActive(false);
+      setDragActive(false)
     }
-  };
+  }
 
   const handleDrop = (e: React.DragEvent<HTMLDivElement>) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setDragActive(false);
-    const file = e.dataTransfer.files?.[0];
+    e.preventDefault()
+    e.stopPropagation()
+    setDragActive(false)
+    const file = e.dataTransfer.files?.[0]
     if (file) {
-      handleFileSelect(file);
+      handleFileSelect(file)
     }
-  };
+  }
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
+    const file = e.target.files?.[0]
     if (file) {
-      handleFileSelect(file);
+      handleFileSelect(file)
     }
-  };
+  }
 
   const handleUpload = async () => {
     if (!selectedFile) {
-      toast.error("No file selected");
-      return;
+      toast.error("No file selected")
+      return
     }
 
     try {
-      setUploadLoading(true);
-      const formData = new FormData();
-      formData.append("file", selectedFile);
+      setUploadLoading(true)
+      const formData = new FormData()
+      formData.append("file", selectedFile)
+      if (name) {
+        formData.append("name", name)
+      }
       if (associateWithProject && selectedProjectId) {
-        formData.append("projectId", selectedProjectId);
+        formData.append("projectId", selectedProjectId)
       }
       if (details) {
-        formData.append("details", details);
+        formData.append("details", details)
       }
 
-      const response = await ApiClient.postForm<any>("/features/upload", formData);
+      const response = await ApiClient.postForm<any>(
+        "/features/upload",
+        formData
+      )
 
       if (response.success) {
         // If it's a scratch layer, save the ID locally
         if (!associateWithProject) {
-          const scratchLayers = JSON.parse(localStorage.getItem('scratch_layers') || '[]');
-          const parentFeature = response.features?.[0]?.parentId || response.features?.[0]?.id;
+          const scratchLayers = JSON.parse(
+            localStorage.getItem("scratch_layers") || "[]"
+          )
+          const parentFeature =
+            response.features?.[0]?.parentId || response.features?.[0]?.id
           if (parentFeature && !scratchLayers.includes(parentFeature)) {
-            scratchLayers.push(parentFeature);
-            localStorage.setItem('scratch_layers', JSON.stringify(scratchLayers));
+            scratchLayers.push(parentFeature)
+            localStorage.setItem(
+              "scratch_layers",
+              JSON.stringify(scratchLayers)
+            )
           }
         }
-        const count = response.count || 0;
-        
+        const count = response.count || 0
+
         if (count === 0) {
           toast.warning("File processed but no features found", {
-            description: response.message || "The file may not contain any valid geographic features",
-          });
+            description:
+              response.message ||
+              "The file may not contain any valid geographic features",
+          })
         } else {
           toast.success("Features uploaded successfully", {
             description: `${count} feature${count !== 1 ? "s" : ""} added to the map`,
-          });
-          
+          })
+
           // Trigger map refresh to show new features
-          triggerRefresh();
+          triggerRefresh()
         }
 
-        handleClose();
+        handleClose()
       } else {
         toast.error("Upload failed", {
           description: response.message || "Unknown error",
-        });
+        })
       }
     } catch (error: any) {
-      console.error("Error uploading file:", error);
+      console.error("Error uploading file:", error)
       toast.error("Failed to upload file", {
         description: error.message || "Please check your file and try again",
-      });
+      })
     } finally {
-      setUploadLoading(false);
+      setUploadLoading(false)
     }
-  };
+  }
 
   const handleClose = () => {
-    setSelectedFile(null);
-    setDetails("");
-    setSelectedProjectId("");
+    setSelectedFile(null)
+    setName("")
+    setDetails("")
+    setSelectedProjectId("")
     if (fileInputRef.current) {
-      fileInputRef.current.value = "";
+      fileInputRef.current.value = ""
     }
-    onOpenChange(false);
-  };
+    onOpenChange(false)
+  }
 
   const getFileIcon = (filename: string) => {
     if (
       filename.toLowerCase().endsWith(".kmz") ||
       filename.toLowerCase().endsWith(".kml")
     ) {
-      return <MapPin className="h-6 w-6 text-blue-500" />;
+      return <MapPin className="h-6 w-6 text-blue-500" />
     }
-    return <FileJson className="h-6 w-6 text-green-500" />;
-  };
+    return <FileJson className="h-6 w-6 text-green-500" />
+  }
 
   const formatFileSize = (bytes: number) => {
-    if (bytes === 0) return "0 Bytes";
-    const k = 1024;
-    const sizes = ["Bytes", "KB", "MB"];
-    const i = Math.floor(Math.log(bytes) / Math.log(k));
-    return Math.round((bytes / Math.pow(k, i)) * 100) / 100 + " " + sizes[i];
-  };
+    if (bytes === 0) return "0 Bytes"
+    const k = 1024
+    const sizes = ["Bytes", "KB", "MB"]
+    const i = Math.floor(Math.log(bytes) / Math.log(k))
+    return Math.round((bytes / Math.pow(k, i)) * 100) / 100 + " " + sizes[i]
+  }
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -236,7 +253,9 @@ export const AddLayerModal: React.FC<AddLayerModalProps> = ({
         <div className="space-y-6 py-4">
           <div
             className={`rounded-lg border-2 border-dashed p-8 transition-colors ${
-              dragActive ? "border-primary bg-primary/5" : "border-muted-foreground/20"
+              dragActive
+                ? "border-primary bg-primary/5"
+                : "border-muted-foreground/20"
             }`}
             onDragEnter={handleDrag}
             onDragLeave={handleDrag}
@@ -265,7 +284,7 @@ export const AddLayerModal: React.FC<AddLayerModalProps> = ({
                     className="sr-only"
                   />
                 </div>
-                <p className="mt-4 text-[10px] text-muted-foreground uppercase tracking-widest font-bold">
+                <p className="mt-4 text-[10px] font-bold tracking-widest text-muted-foreground uppercase">
                   Supported: KML, KMZ, GeoJSON
                 </p>
               </div>
@@ -274,7 +293,9 @@ export const AddLayerModal: React.FC<AddLayerModalProps> = ({
                 <div className="flex items-center gap-3">
                   {getFileIcon(selectedFile.name)}
                   <div className="overflow-hidden">
-                    <p className="text-sm font-medium truncate max-w-[200px]">{selectedFile.name}</p>
+                    <p className="max-w-[200px] truncate text-sm font-medium">
+                      {selectedFile.name}
+                    </p>
                     <p className="text-[10px] text-muted-foreground">
                       {formatFileSize(selectedFile.size)}
                     </p>
@@ -285,9 +306,9 @@ export const AddLayerModal: React.FC<AddLayerModalProps> = ({
                   variant="ghost"
                   size="icon"
                   onClick={() => {
-                    setSelectedFile(null);
+                    setSelectedFile(null)
                     if (fileInputRef.current) {
-                      fileInputRef.current.value = "";
+                      fileInputRef.current.value = ""
                     }
                   }}
                   className="h-8 w-8 text-muted-foreground hover:text-foreground"
@@ -299,14 +320,18 @@ export const AddLayerModal: React.FC<AddLayerModalProps> = ({
           </div>
 
           <div className="space-y-4">
-            <div className="flex items-center justify-between py-2 border-b border-border/50">
+            <div className="flex items-center justify-between border-b border-border/50 py-2">
               <div className="space-y-0.5">
-                <label className="text-sm font-medium">Associate with Project</label>
-                <p className="text-xs text-muted-foreground">Tie these features to the selected project</p>
+                <label className="text-sm font-medium">
+                  Associate with Project
+                </label>
+                <p className="text-xs text-muted-foreground">
+                  Tie these features to the selected project
+                </p>
               </div>
-              <input 
-                type="checkbox" 
-                checked={associateWithProject} 
+              <input
+                type="checkbox"
+                checked={associateWithProject}
                 onChange={(e) => setAssociateWithProject(e.target.checked)}
                 className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
               />
@@ -314,7 +339,7 @@ export const AddLayerModal: React.FC<AddLayerModalProps> = ({
 
             {associateWithProject && (
               <div className="space-y-2">
-                <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                <label className="text-xs font-semibold tracking-wider text-muted-foreground uppercase">
                   Target Project
                 </label>
                 <Select
@@ -325,7 +350,9 @@ export const AddLayerModal: React.FC<AddLayerModalProps> = ({
                   <SelectTrigger className="h-9 text-sm">
                     <SelectValue
                       placeholder={
-                        projectsLoading ? "Loading projects..." : "Select project"
+                        projectsLoading
+                          ? "Loading projects..."
+                          : "Select project"
                       }
                     />
                   </SelectTrigger>
@@ -341,14 +368,26 @@ export const AddLayerModal: React.FC<AddLayerModalProps> = ({
             )}
 
             <div className="space-y-2">
-              <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+              <label className="text-xs font-semibold tracking-wider text-muted-foreground uppercase">
+                Layer Name (Optional)
+              </label>
+              <Input
+                placeholder="e.g., Drainage Network, Service Points..."
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                className="h-9 text-sm"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-xs font-semibold tracking-wider text-muted-foreground uppercase">
                 Description (Optional)
               </label>
               <Textarea
                 placeholder="Details about this layer..."
                 value={details}
                 onChange={(e) => setDetails(e.target.value)}
-                className="min-h-[80px] text-sm resize-none"
+                className="min-h-[80px] resize-none text-sm"
               />
             </div>
           </div>
@@ -366,8 +405,12 @@ export const AddLayerModal: React.FC<AddLayerModalProps> = ({
           </Button>
           <Button
             onClick={handleUpload}
-            disabled={!selectedFile || uploadLoading || (associateWithProject && !selectedProjectId)}
-            className="h-9 px-6 gap-2"
+            disabled={
+              !selectedFile ||
+              uploadLoading ||
+              (associateWithProject && !selectedProjectId)
+            }
+            className="h-9 gap-2 px-6"
           >
             {uploadLoading ? (
               <>
@@ -384,5 +427,5 @@ export const AddLayerModal: React.FC<AddLayerModalProps> = ({
         </DialogFooter>
       </DialogContent>
     </Dialog>
-  );
-};
+  )
+}

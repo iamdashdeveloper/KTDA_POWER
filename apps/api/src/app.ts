@@ -29,6 +29,7 @@ import parcelsRoutes from "./routes/parcels/index.js"
 import ownersRoutes from "./routes/owners/index.js"
 import complaintsRoutes from "./routes/complaints/index.js"
 import feedbackRoutes from "./routes/feedback/index.js"
+import { hydroModelsRoutes } from "./routes/hydro-models/index.js"
 import { ussdService } from "./services/ussdService.js"
 import { fileURLToPath } from "url"
 import path from "path"
@@ -135,6 +136,7 @@ export async function createApp() {
   await fastify.register(ownersRoutes)
   await fastify.register(complaintsRoutes)
   await fastify.register(feedbackRoutes)
+  await fastify.register(hydroModelsRoutes)
   await fastify.register(ussdService)
 
   return fastify
