@@ -49,6 +49,7 @@ export const Ribbon: React.FC<RibbonProps> = ({ onToolAction }) => {
     executeCommand,
     projectFeatures,
     scratchFeatures,
+    setWeatherPanelOpen,
   } = useMapStore()
   const [isAddLayerOpen, setIsAddLayerOpen] = useState(false)
   const [isGenerateChainnageOpen, setIsGenerateChainnageOpen] = useState(false)
@@ -155,6 +156,11 @@ export const Ribbon: React.FC<RibbonProps> = ({ onToolAction }) => {
           </div>,
           "Layer Properties"
         )
+        break
+      case "open-weather-station":
+        // Open weather panel in center and collapse right panel
+        setWeatherPanelOpen(true)
+        setCollapsed("right", true)
         break
       default:
         break

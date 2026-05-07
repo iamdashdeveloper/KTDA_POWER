@@ -13,6 +13,7 @@ import {
   Map as MapIcon,
   ChevronRight,
   Box,
+  Cloud,
 } from "lucide-react"
 import { RibbonGroup } from "../RibbonGroup"
 import { RibbonButton } from "../RibbonButton"
@@ -144,6 +145,29 @@ export const AnalysisToolbar: React.FC<AnalysisToolbarProps> = ({
             icon={<AlertTriangle size={14} />}
             label="Flood Prediction"
             onClick={() => onToolClick("flood-prediction")}
+          />
+          <RibbonSmallButton
+            icon={<Box size={14} />}
+            label="Create Model"
+            onClick={() => {
+              console.log("[AnalysisToolbar] Create Model clicked")
+              setIsCreateHydroModelOpen(true)
+            }}
+          />
+          <RibbonSmallButton
+            icon={<Box size={14} />}
+            label="Load Model"
+            onClick={() => {
+              console.log("[AnalysisToolbar] Load Model clicked")
+              setIsLoadHydroModelOpen(true)
+            }}
+          />
+        </div>
+        <div className="ml-1 flex flex-col justify-center gap-1 border-l border-border/50 pl-2">
+          <RibbonSmallButton
+            icon={<Cloud size={14} />}
+            label="Weather Station"
+            onClick={() => onToolClick("open-weather-station")}
           />
           <RibbonSmallButton
             icon={<Box size={14} />}

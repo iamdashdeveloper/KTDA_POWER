@@ -55,6 +55,9 @@ interface MapStore {
   // Refresh Trigger
   refreshTrigger: number
   triggerRefresh: () => void
+  // Weather Panel
+  weatherPanelOpen: boolean
+  setWeatherPanelOpen: (open: boolean) => void
 }
 
 export const useMapStore = create<MapStore>((set) => ({
@@ -149,4 +152,6 @@ export const useMapStore = create<MapStore>((set) => ({
   refreshTrigger: 0,
   triggerRefresh: () =>
     set((state) => ({ refreshTrigger: state.refreshTrigger + 1 })),
+  weatherPanelOpen: false,
+  setWeatherPanelOpen: (open) => set({ weatherPanelOpen: open }),
 }))

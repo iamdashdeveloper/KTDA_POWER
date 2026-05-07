@@ -19,12 +19,14 @@ import { cn } from "@workspace/ui/lib/utils"
 import { useLayout } from "@/context/LayoutContext"
 import { useMapStore } from "@/store/useMapStore"
 import { useHydroModelStore } from "@/store/useHydroModelStore"
+import { useProjectStore } from "@/store/useProjectStore"
 
 // Modular Components
 import { PanelHeader } from "./panels/PanelHeader"
 import { ContentsTab } from "./panels/ContentsTab"
 import { BottomPanelTabs } from "./panels/BottomPanelTabs"
 import { HydroModelTab } from "./panels/HydroModelTab"
+import { WeatherPanel } from "./panels/WeatherPanel"
 
 interface RootLayoutProps {
   children: React.ReactNode
@@ -33,10 +35,39 @@ interface RootLayoutProps {
 
 export const RootLayout: React.FC<RootLayoutProps> = ({ children }) => {
   const { panels, setCollapsed } = useLayout()
-  const { featureCount, issueCount } = useMapStore()
+  const {
+    featureCount,
+    issueCount,
+    weatherPanelOpen,
+    setWeatherPanelOpen,
+    viewCenter,
+  } = useMapStore()
   const { tabs: hydroModelTabs, clearAll } = useHydroModelStore()
+  const { activeProject } = useProjectStore()
   const [activeTabId, setActiveTabId] = React.useState<string>("contents")
   const bottomPanelRef = React.useRef<any>(null)
+
+  // Extract project coordinates with fallback to map center
+  const getWeatherCoordinates = () => {
+    if (
+      activeProject?.location &&
+      typeof activeProject.location === "object" &&
+      "latitude" in activeProject.location &&
+      "longitude" in activeProject.location
+    ) {
+      return {
+        latitude: activeProject.location.latitude,
+        longitude: activeProject.location.longitude,
+      }
+    }
+    // Fallback to map center if project location is not available
+    return {
+      latitude: viewCenter[1],
+      longitude: viewCenter[0],
+    }
+  }
+
+  const weatherCoords = getWeatherCoordinates()
 
   // Build combined tabs array
   const headerTabs = React.useMemo(() => {
@@ -166,7 +197,34 @@ export const RootLayout: React.FC<RootLayoutProps> = ({ children }) => {
           {/* Center Area (Children + Bottom Panel) */}
           <ResizablePanel defaultSize={60}>
             <ResizablePanelGroup direction="vertical">
-              <ResizablePanel defaultSize={75}>{children}</ResizablePanel>
+              <ResizablePanel defaultSize={75}>
+                {weatherPanelOpen ? (
+                  <div className="flex h-full w-full flex-col bg-card">
+                    <div className="flex items-center justify-between border-b border-border px-4 py-3">
+                      <h2 className="text-sm font-semibold text-foreground">
+                        Weather Station
+                      </h2>
+                      <button
+                        onClick={() => {
+                          setWeatherPanelOpen(false)
+                        }}
+                        className="rounded p-1 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+                      >
+                        ✕
+                      </button>
+                    </div>
+                    <div className="flex-1 overflow-auto">
+                      <WeatherPanel
+                        stationName={activeProject?.name || "Weather Station"}
+                        latitude={weatherCoords.latitude}
+                        longitude={weatherCoords.longitude}
+                      />
+                    </div>
+                  </div>
+                ) : (
+                  children
+                )}
+              </ResizablePanel>
 
               <ResizableHandle
                 withHandle
