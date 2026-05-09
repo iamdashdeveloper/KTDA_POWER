@@ -43,7 +43,7 @@ export class ApiClient {
       const response = await fetch(url, {
         ...options,
         headers,
-        credentials: "include",
+        credentials: "omit", // Don't send credentials for cross-origin requests
         signal: controller.signal,
       })
 

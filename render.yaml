@@ -1,0 +1,22 @@
+services:
+  - type: web
+    name: ktda-power-api
+    runtime: node
+    plan: free
+    buildCommand: pnpm install && pnpm build
+    startCommand: cd apps/api && pnpm start
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 3001
+      - key: HOST
+        value: 0.0.0.0
+      - key: DATABASE_URL
+        fromDatabase:
+          name: ktda-power-db
+          property: connectionString
+      - key: JWT_SECRET
+        sync: false
+      - key: CORS_ORIGIN
+        value: https://ktda-power.onrender.com,https://ktda-power-admin-web.vercel.app,https://ktda-power-web-portal.vercel.app,https://ktda-power-field-tool.vercel.app

@@ -71,7 +71,7 @@ export async function createApp() {
       return callback(new Error("Not allowed by CORS"), false)
     },
     methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-    credentials: true,
+    credentials: false, // Don't require credentials for CORS
     allowedHeaders: ["Content-Type", "Authorization"],
   })
 

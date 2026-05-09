@@ -18,8 +18,13 @@ if (!API_BASE_URL || API_BASE_URL === "undefined") {
 export const apiClient = axios.create({
   baseURL: API_BASE_URL || "https://ktda-power.onrender.com", // Fallback for safety
   timeout: 30000, // 30 second timeout
-  withCredentials: true, // Send cookies with requests
+  withCredentials: false, // Don't send credentials for cross-origin requests
 })
+
+// Retry configuration for network errors
+let retryCount: Record<string, number> = {}
+const MAX_RETRIES = 3
+const RETRY_DELAY = 1000 // ms
 
 // Add token to requests if available
 apiClient.interceptors.request.use((config) => {
@@ -32,10 +37,15 @@ apiClient.interceptors.request.use((config) => {
   return config
 })
 
-// Handle responses and errors
+// Handle responses and errors with retry logic
 apiClient.interceptors.response.use(
-  (response) => response,
-  (error: AxiosError) => {
+  (response) => {
+    // Reset retry count on success
+    const key = `${response.config.method}:${response.config.url}`
+    retryCount[key] = 0
+    return response
+  },
+  async (error: AxiosError) => {
     // Log the full error for debugging
     console.error("[API] Full error object:", {
       message: error.message,
@@ -47,6 +57,28 @@ apiClient.interceptors.response.use(
         method: error.config?.method,
       },
     })
+
+    // Determine request key for retry tracking
+    const requestKey = `${error.config?.method}:${error.config?.url}`
+    const currentRetry = retryCount[requestKey] || 0
+
+    // Retry logic for network errors (not for 4xx/5xx responses)
+    if (
+      !error.response &&
+      error.code !== "ECONNABORTED" &&
+      currentRetry < MAX_RETRIES
+    ) {
+      retryCount[requestKey] = currentRetry + 1
+      console.warn(
+        `[API] Network error, retrying... (${currentRetry + 1}/${MAX_RETRIES})`
+      )
+
+      // Wait before retrying
+      await new Promise((resolve) => setTimeout(resolve, RETRY_DELAY))
+
+      // Retry the request
+      return apiClient.request(error.config!)
+    }
 
     // Handle specific error scenarios
     if (error.code === "ECONNABORTED") {
