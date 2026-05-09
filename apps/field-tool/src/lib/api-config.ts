@@ -9,7 +9,7 @@ export const API_CONFIG = {
   // Use environment variable for API URL
   // In production, set VITE_API_URL to full URL
   baseUrl: import.meta.env.VITE_API_URL as string,
-  timeout: 10000, // 10 seconds
+  timeout: 30000, // 30 seconds (increased for Render cold starts)
 }
 
 /**
@@ -38,7 +38,7 @@ export async function apiRequest<T = any>(
     const response = await fetch(url, {
       ...options,
       signal: controller.signal,
-      credentials: options.credentials || "include",
+      credentials: "omit", // Use 'omit' for production CORS compatibility
       headers: {
         "Content-Type": "application/json",
         ...options.headers,
@@ -60,8 +60,8 @@ export async function apiRequest<T = any>(
     if (error instanceof TypeError && error.message.includes("fetch")) {
       // Network error - API might not be running
       const err = new Error(
-        `Unable to connect to API. Make sure the API server is running on port 3001. ` +
-          `(Attempting to reach: ${API_CONFIG.baseUrl})`
+        `Unable to connect to API. Please ensure the API server is running at ${API_CONFIG.baseUrl}. ` +
+          `This could also be a CORS issue or network connectivity problem.`
       )
       ;(err as any).originalError = error
       ;(err as any).isNetworkError = true

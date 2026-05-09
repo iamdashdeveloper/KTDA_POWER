@@ -19,4 +19,4 @@ services:
       - key: JWT_SECRET
         sync: false
       - key: CORS_ORIGIN
-        value: https://ktda-power.onrender.com,https://ktda-power-admin-web.vercel.app,https://ktda-power-web-portal.vercel.app,https://ktda-power-field-tool.vercel.app
+        value: https://ktda-power-api.onrender.com,https://ktda-power.onrender.com,https://ktda-power-admin-web.vercel.app,https://ktda-power-web-portal.vercel.app,https://ktda-power-field-tool.vercel.app

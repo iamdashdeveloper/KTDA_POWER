@@ -1,6 +1,6 @@
 # KTDA Power - Production Deployment Troubleshooting Guide
 
-## Current Issue: "Network error. API URL: https://ktda-power.onrender.com"
+## Current Issue: "Network error. API URL: https://ktda-power-api.onrender.com"
 
 This error means the frontend is correctly pointing to the API URL, but the API server is not responding. This typically indicates one of the following issues:
 
@@ -38,7 +38,7 @@ This error means the frontend is correctly pointing to the API URL, but the API 
 DATABASE_URL=postgresql://...  (PostgreSQL connection string)
 JWT_SECRET=<random-string>      (JWT signing secret)
 NODE_ENV=production
-CORS_ORIGIN=https://ktda-power.onrender.com,https://ktda-power-admin-web.vercel.app,...
+CORS_ORIGIN=https://ktda-power-api.onrender.com,https://ktda-power-admin-web.vercel.app,...
 ```
 
 **Check:**
@@ -86,7 +86,7 @@ If API returns CORS error (different from "Network error"):
 1. **Check if API is running:**
 
    ```bash
-   curl https://ktda-power.onrender.com/health
+   curl https://ktda-power-api.onrender.com/health
    ```
 
    Should return: `{"status":"ok"}`
@@ -94,7 +94,7 @@ If API returns CORS error (different from "Network error"):
 2. **Check API configuration:**
 
    ```bash
-   curl https://ktda-power.onrender.com/debug
+   curl https://ktda-power-api.onrender.com/debug
    ```
 
    Should show environment variables and CORS config

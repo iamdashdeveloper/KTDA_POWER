@@ -14,7 +14,7 @@ import {
   SelectValue,
 } from "@workspace/ui/components/select"
 import { Mail, Lock, User, Building2, AlertCircle } from "lucide-react"
-import { apiRequest } from "@/lib/api-config"
+import { ApiClient } from "@/lib/api"
 
 const SignupSchema = z.object({
   email: z.string().email("Invalid email address"),
@@ -62,25 +62,15 @@ export function SignUpForm({ onSuccess, onNavigateToSignin }: SignUpFormProps) {
     const fetchCompanies = async () => {
       try {
         setApiError("")
-        const data = await apiRequest<Company[]>("/companies", {
-          method: "GET",
-        })
+        const data = await ApiClient.get<Company[]>("/companies")
         setCompanies(Array.isArray(data) ? data : [])
       } catch (err: any) {
         const errorMsg = err.message || "Failed to fetch companies"
         setApiError(errorMsg)
         console.error("Failed to fetch companies:", err)
-
-        // Show diagnostics toast
-        if (err.isNetworkError) {
-          toast.error("API Server Connection Error", {
-            description: "Make sure the API server is running on port 3001",
-          })
-        } else {
-          toast.error("Failed to load companies", {
-            description: errorMsg,
-          })
-        }
+        toast.error("Failed to load companies", {
+          description: errorMsg,
+        })
       }
     }
 
@@ -92,10 +82,10 @@ export function SignUpForm({ onSuccess, onNavigateToSignin }: SignUpFormProps) {
     setApiError("")
 
     try {
-      const result = await apiRequest<any>("/auth/register", {
-        method: "POST",
-        body: JSON.stringify(data),
-      })
+      const result = await ApiClient.post<{ token: string; user: any }>(
+        "/auth/register",
+        data
+      )
 
       localStorage.setItem("authToken", result.token)
       localStorage.setItem("user", JSON.stringify(result.user))

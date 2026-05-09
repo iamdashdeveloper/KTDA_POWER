@@ -7,7 +7,7 @@ import { Button } from "@workspace/ui/components/button"
 import { Input } from "@workspace/ui/components/input"
 import { Card } from "@workspace/ui/components/card"
 import { Mail, Lock, AlertCircle } from "lucide-react"
-import { apiRequest } from "@/lib/api-config"
+import { ApiClient } from "@/lib/api"
 
 const LoginSchema = z.object({
   email: z.string().email("Invalid email address"),
@@ -38,10 +38,10 @@ export function SignInForm({ onSuccess, onNavigateToSignup }: SignInFormProps) {
     setApiError("")
 
     try {
-      const result = await apiRequest<any>("/auth/login", {
-        method: "POST",
-        body: JSON.stringify(data),
-      })
+      const result = await ApiClient.post<{ token: string; user: any }>(
+        "/auth/login",
+        data
+      )
 
       localStorage.setItem("authToken", result.token)
       localStorage.setItem("user", JSON.stringify(result.user))

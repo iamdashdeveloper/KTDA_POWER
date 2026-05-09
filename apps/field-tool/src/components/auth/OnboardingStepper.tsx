@@ -6,6 +6,7 @@ import { toast } from "sonner"
 import { Button } from "@workspace/ui/components/button"
 import { Input } from "@workspace/ui/components/input"
 import { Textarea } from "@workspace/ui/components/textarea"
+import { ApiClient } from "@/lib/api"
 import { CheckCircle } from "lucide-react"
 import {
   RegistrationStepper,
@@ -33,9 +34,6 @@ export function OnboardingStepper({
 }: OnboardingStepperProps) {
   const [currentStep, setCurrentStep] = useState(0)
   const [isLoading, setIsLoading] = useState(false)
-  const [apiBaseUrl] = useState(
-    import.meta.env.VITE_API_URL as string
-  )
 
   const {
     register,
@@ -69,37 +67,13 @@ export function OnboardingStepper({
     setIsLoading(true)
 
     try {
-      const token = localStorage.getItem("authToken")
-      if (!token) {
-        toast.error("No authentication token found")
-        setIsLoading(false)
-        return
-      }
-
-      const response = await fetch(`${apiBaseUrl}/auth/onboarding`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        credentials: "include",
-        body: JSON.stringify(data),
-      })
-
-      if (!response.ok) {
-        const errorData = await response.json()
-        const errorMessage = errorData.error || "Onboarding failed"
-        toast.error(errorMessage)
-        setIsLoading(false)
-        return
-      }
-
-      const result = await response.json()
+      const result = await ApiClient.post<{ user: any }>("/auth/onboarding", data)
       localStorage.setItem("user", JSON.stringify(result.user))
       toast.success("Profile completed successfully!")
       onComplete?.(result.user)
     } catch (err: any) {
       toast.error(err.message || "An error occurred during onboarding")
+    } finally {
       setIsLoading(false)
     }
   }
