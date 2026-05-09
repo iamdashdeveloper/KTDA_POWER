@@ -1,4 +1,4 @@
-const API_BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:3001"
+const API_BASE_URL = import.meta.env.VITE_API_URL
 
 interface FetchOptions extends RequestInit {
   headers?: Record<string, string>
@@ -24,7 +24,7 @@ export class ApiClient {
       headers.Authorization = `Bearer ${token}`
     }
 
-    console.log(`[ApiClient] ${options.method || 'GET'} ${url}`)
+    console.log(`[ApiClient] ${options.method || "GET"} ${url}`)
     const response = await fetch(url, {
       ...options,
       headers,
@@ -32,7 +32,9 @@ export class ApiClient {
     })
 
     if (!response.ok) {
-      console.error(`[ApiClient] Request failed with status ${response.status}: ${url}`)
+      console.error(
+        `[ApiClient] Request failed with status ${response.status}: ${url}`
+      )
       const error = await response.json().catch(() => ({}))
       console.error(`[ApiClient] Error details:`, error)
       throw new Error(error.error || error.message || "Request failed")
@@ -53,7 +55,11 @@ export class ApiClient {
     })
   }
 
-  static postForm<T>(endpoint: string, formData: FormData, options?: FetchOptions) {
+  static postForm<T>(
+    endpoint: string,
+    formData: FormData,
+    options?: FetchOptions
+  ) {
     return this.request<T>(endpoint, {
       ...options,
       method: "POST",
