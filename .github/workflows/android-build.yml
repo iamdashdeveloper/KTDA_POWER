@@ -60,7 +60,7 @@ jobs:
 
       # 🧠 Ensure Gradle uses correct Java runtime
       - name: Set JAVA_HOME
-        run: echo "JAVA_HOME=$JAVA_HOME_21_X64" >> $GITHUB_ENV
+        run: echo "JAVA_HOME=$JAVA_HOME_21_X64" >> gradle.properties
 
       # 🏗️ Build APK
       - name: Build APK
