@@ -1,0 +1,67 @@
+name: Build Android APK
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      # 📥 Checkout
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      # 🟢 Node
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      # 📦 pnpm
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v3
+        with:
+          version: 9
+
+      # 📦 Install deps
+      - name: Install dependencies
+        run: pnpm install
+
+      # 🔨 Build ONLY your field-tool app
+      - name: Build web app
+        run: pnpm --filter field-tool build
+
+      # 🤖 Setup Android SDK (CRITICAL)
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      # ⚡ Sync Capacitor (INSIDE app folder)
+      - name: Sync Capacitor
+        run: |
+          cd apps/field-tool
+          npx cap sync android
+
+      # ☕ Java (Gradle needs it)
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      # 🏗️ Build APK
+      - name: Build APK
+        run: |
+          cd apps/field-tool/android
+          chmod +x gradlew
+          ./gradlew assembleDebug
+
+      # 📦 Upload APK
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: field-tool-apk
+          path: apps/field-tool/android/app/build/outputs/apk/debug/app-debug.apk
