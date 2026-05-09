@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom"
 import { Button } from "@workspace/ui/components/button"
 import { Card } from "@workspace/ui/components/card"
 import { useProjectStore, type Project } from "@/store/useProjectStore"
+import { ApiClient } from "@/lib/api"
 import {
   MapPin,
   Building2,
@@ -27,27 +28,22 @@ export default function Projects() {
   const [projects, setProjects] = useState<ProjectWithAccess[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [searchQuery, setSearchQuery] = useState("")
-  const [apiBaseUrl] = useState(import.meta.env.VITE_API_URL)
 
   useEffect(() => {
     const fetchProjects = async () => {
       setIsLoading(true)
       try {
-        // In a real app, we'd check for a token
-        const response = await fetch(`${apiBaseUrl}/projects`, {
-          credentials: "include",
-        })
+        // Use ApiClient for proper error handling and retry logic
+        const data = await ApiClient.get<Project[]>("/projects")
+        const projectsData = Array.isArray(data)
+          ? data
+          : (data as any)?.data || data
 
-        if (response.ok) {
-          const data = await response.json()
-          const projectsData = data.data || data
-
-          const projectsWithAccess = projectsData.map((project: Project) => ({
-            ...project,
-            hasAccess: true, // For now, assume access in web-portal
-          }))
-          setProjects(projectsWithAccess)
-        }
+        const projectsWithAccess = projectsData.map((project: Project) => ({
+          ...project,
+          hasAccess: true, // For now, assume access in web-portal
+        }))
+        setProjects(projectsWithAccess)
       } catch (error) {
         console.error("Error fetching projects:", error)
       } finally {
@@ -56,7 +52,7 @@ export default function Projects() {
     }
 
     fetchProjects()
-  }, [apiBaseUrl])
+  }, [])
 
   const handleOpenProject = (project: Project) => {
     setActiveProject(project)

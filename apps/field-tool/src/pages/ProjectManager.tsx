@@ -4,6 +4,7 @@ import { toast } from "sonner"
 import { Button } from "@workspace/ui/components/button"
 import { Card } from "@workspace/ui/components/card"
 import { useProjectStore, type Project } from "@/store/useProjectStore"
+import { ApiClient } from "@/lib/api"
 import { MapPin, Building2, Loader2 } from "lucide-react"
 
 interface ProjectWithAccess extends Project {
@@ -18,9 +19,6 @@ export default function ProjectManager() {
   const [isLoading, setIsLoading] = useState(true)
   const [selectedProject, setSelectedProject] = useState<string | null>(null)
   const [user, setUser] = useState<any>(null)
-  const [apiBaseUrl] = useState(
-    import.meta.env.VITE_API_URL as string
-  )
 
   // Fetch user and projects on mount
   useEffect(() => {
@@ -37,30 +35,19 @@ export default function ProjectManager() {
         const userData = JSON.parse(savedUser)
         setUser(userData)
         console.log(userData)
-        // Fetch projects (would be from API in production)
-        const response = await fetch(`${apiBaseUrl}/projects`, {
-          headers: {
-            Authorization: `Bearer ${localStorage.getItem("authToken")}`,
-          },
-          credentials: "include",
-        })
-
-        if (response.ok) {
-          const data = await response.json()
-          const projectsWithAccess: ProjectWithAccess[] = (
-            data.data || data
-          ).map((project: Project) => ({
+        // Use ApiClient for proper error handling and retry logic
+        const data = await ApiClient.get<Project[]>("/projects")
+        const projectsData = Array.isArray(data) ? data : (data as any)?.data || data
+        const projectsWithAccess: ProjectWithAccess[] = projectsData.map(
+          (project: Project) => ({
             ...project,
             hasAccess:
               userData.companyId === project.companyId ||
               userData.companyId === "cmo739d5b0003fwuh63xk88pg",
-
             canRequest: userData.companyId !== project.companyId,
-          }))
-          setProjects(projectsWithAccess)
-        } else {
-          toast.error("Failed to fetch projects")
-        }
+          })
+        )
+        setProjects(projectsWithAccess)
       } catch (error) {
         console.error("Error fetching projects:", error)
         toast.error("Failed to load projects")
@@ -70,7 +57,7 @@ export default function ProjectManager() {
     }
 
     fetchUserAndProjects()
-  }, [apiBaseUrl, navigate])
+  }, [navigate])
 
   const handleOpenProject = (project: ProjectWithAccess) => {
     if (!project.hasAccess) {
