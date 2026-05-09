@@ -27,7 +27,7 @@ export default function Projects() {
   const [projects, setProjects] = useState<ProjectWithAccess[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [searchQuery, setSearchQuery] = useState("")
-  const [apiBaseUrl] = useState(import.meta.env.VITE_API_URL as string)
+  const [apiBaseUrl] = useState(import.meta.env.VITE_API_URL)
 
   useEffect(() => {
     const fetchProjects = async () => {
