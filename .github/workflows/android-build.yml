@@ -15,7 +15,7 @@ jobs:
       - name: Checkout repo
         uses: actions/checkout@v4
 
-      # 🟢 Node
+      # 🟢 Node (Capacitor requires >=22)
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
@@ -39,7 +39,13 @@ jobs:
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
 
-      # ⚡ Sync Capacitor (INSIDE app folder)
+      # ➕ Add Android platform (FIX)
+      - name: Add Android platform
+        run: |
+          cd apps/field-tool
+          npx cap add android
+
+      # ⚡ Sync Capacitor
       - name: Sync Capacitor
         run: |
           cd apps/field-tool
