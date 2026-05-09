@@ -33,7 +33,11 @@ import {
   FileText,
   AlertCircle,
 } from "lucide-react"
-
+import { BsGeo } from "react-icons/bs"
+import DefaultLoader from "@/components/Logo"
+import { LuLandPlot } from "react-icons/lu"
+import { TbWavesElectricity } from "react-icons/tb"
+import { FaPeopleRobbery } from "react-icons/fa6"
 export function RootLayout() {
   const location = useLocation()
   const [openItems, setOpenItems] = useState<string[]>([])
@@ -58,11 +62,7 @@ export function RootLayout() {
       label: "Users",
       href: "/users",
       icon: Users,
-      actions: [
-        { label: "Add User", href: "/users/add", icon: Plus },
-        { label: "Edit User", href: "/users/edit", icon: Edit },
-        { label: "Remove User", href: "/users/remove", icon: Trash2 },
-      ],
+      actions: [{ label: "Add User", href: "/users/add", icon: Plus }],
     },
     {
       id: "permissions",
@@ -71,27 +71,15 @@ export function RootLayout() {
       icon: Lock,
       actions: [
         { label: "Create Permission", href: "/permissions/create", icon: Plus },
-        {
-          label: "Delete Permission",
-          href: "/permissions/delete",
-          icon: Trash2,
-        },
-        {
-          label: "Manage User Permissions",
-          href: "/permissions/manage",
-          icon: SettingsIcon,
-        },
       ],
     },
     {
       id: "projects",
-      label: "Projects",
+      label: "Hydro Projects",
       href: "/projects",
-      icon: FolderOpen,
+      icon: TbWavesElectricity,
       actions: [
         { label: "Create Project", href: "/projects/create", icon: Plus },
-        { label: "Edit Project", href: "/projects/edit", icon: Edit },
-        { label: "Delete Project", href: "/projects/delete", icon: Trash2 },
       ],
     },
     {
@@ -101,39 +89,15 @@ export function RootLayout() {
       icon: Building,
       actions: [
         { label: "Create Company", href: "/companies/create", icon: Plus },
-        { label: "Edit Company", href: "/companies/edit", icon: Edit },
-        { label: "Delete Company", href: "/companies/delete", icon: Trash2 },
-      ],
-    },
-    {
-      id: "articles",
-      label: "Articles",
-      href: "/articles",
-      icon: FileText,
-      actions: [
-        { label: "Create Article", href: "/articles/create", icon: Plus },
-        { label: "Edit Article", href: "/articles/edit", icon: Edit },
-        { label: "Delete Article", href: "/articles/delete", icon: Trash2 },
-      ],
-    },
-    {
-      id: "issues",
-      label: "Issues",
-      href: "/issues",
-      icon: AlertCircle,
-      actions: [
-        { label: "Report Issue", href: "/issues/create", icon: Plus },
-        { label: "Edit Issue", href: "/issues/edit", icon: Edit },
-        { label: "Resolve Issue", href: "/issues/resolve", icon: Trash2 },
       ],
     },
     {
       id: "cadastre",
       label: "Cadastre",
       href: "/cadastre",
-      icon: AlertCircle,
+      icon: LuLandPlot,
       actions: [
-        { label: "Complaints", href: "/complaints", icon: Plus },
+        { label: "Complaints", href: "/complaints", icon: FaPeopleRobbery },
         { label: "Send Feedback", href: "/cadastre/feedback", icon: Edit },
         { label: "Resolve Issue", href: "/cadastre/resolve", icon: Trash2 },
       ],
@@ -142,11 +106,9 @@ export function RootLayout() {
       id: "features",
       label: "Features",
       href: "/features",
-      icon: AlertCircle,
+      icon: BsGeo,
       actions: [
         { label: "Upload features", href: "/features/upload", icon: Plus },
-        { label: "Manage Features", href: "/features/manage", icon: Edit },
-        { label: "Sensors", href: "/features/sensors", icon: Trash2 },
       ],
     },
   ]
@@ -161,8 +123,9 @@ export function RootLayout() {
     >
       <div className="flex h-screen w-full">
         <Sidebar>
-          <SidebarHeader className="border-b p-4">
-            <h1 className="text-xl font-bold">Admin</h1>
+          <SidebarHeader className="flex flex-row items-center border-b p-4">
+            <DefaultLoader className="h-10 w-10" />
+            <h1 className="text-xl font-bold">KTPC Admin Panel</h1>
           </SidebarHeader>
           <SidebarContent>
             <SidebarMenu>

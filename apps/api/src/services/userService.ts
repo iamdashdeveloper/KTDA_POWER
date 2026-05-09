@@ -3,7 +3,7 @@ import { PrismaClient } from "../../src/generated/prisma/client"
 export class UserService {
   constructor(private prisma: PrismaClient) {}
 
-  async findById(id: bigint) {
+  async findById(id: string) {
     return this.prisma.user.findUnique({
       where: { id },
       select: {
@@ -37,7 +37,7 @@ export class UserService {
   }
 
   async create(data: {
-    companyId: bigint
+    companyId: string
     email: string
     password: string
     firstName: string
@@ -49,7 +49,14 @@ export class UserService {
   }) {
     return this.prisma.user.create({
       data: {
-        ...data,
+        companyId: data.companyId,
+        email: data.email,
+        password: data.password,
+        firstName: data.firstName,
+        lastName: data.lastName,
+        position: data.position,
+        bio: data.bio,
+        avatarUrl: data.avatarUrl,
         metadata: data.metadata || {},
       },
       select: {
@@ -62,7 +69,7 @@ export class UserService {
     })
   }
 
-  async update(id: bigint, data: any) {
+  async update(id: string, data: any) {
     return this.prisma.user.update({
       where: { id },
       data,
@@ -76,14 +83,14 @@ export class UserService {
     })
   }
 
-  async delete(id: bigint) {
+  async delete(id: string) {
     return this.prisma.user.delete({
       where: { id },
       select: { id: true },
     })
   }
 
-  async listByCompany(companyId: bigint) {
+  async listByCompany(companyId: string) {
     return this.prisma.user.findMany({
       where: { companyId },
       select: {

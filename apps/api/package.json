@@ -30,6 +30,7 @@
     "zod": "^3.25.76"
   },
   "devDependencies": {
+    "@types/geojson": "^7946.0.16",
     "@types/node": "^25.1.0",
     "@types/pg": "^8.20.0",
     "@types/xml2js": "^0.4.14",

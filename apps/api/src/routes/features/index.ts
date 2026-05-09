@@ -481,7 +481,7 @@ export async function featuresRoutes(fastify: FastifyInstance) {
       reply: FastifyReply
     ) => {
       try {
-        const { name, geometry, details, parentId } = request.body as any
+        const { name, geometry, details, parentId, projectId } = request.body as any
 
         // Update non-geometry fields with Prisma
         const updateData: any = {}

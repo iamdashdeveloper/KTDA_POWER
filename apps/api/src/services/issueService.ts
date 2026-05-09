@@ -3,7 +3,7 @@ import { PrismaClient } from "../../src/generated/prisma/client"
 export class IssueService {
   constructor(private prisma: PrismaClient) {}
 
-  async findById(id: bigint) {
+  async findById(id: string) {
     return this.prisma.issue.findUnique({
       where: { id },
       include: {
@@ -35,8 +35,8 @@ export class IssueService {
   }
 
   async create(data: {
-    projectId: bigint
-    featureId?: bigint
+    projectId: string
+    featureId?: string
     title: string
     description?: string
     priority: number
@@ -45,7 +45,12 @@ export class IssueService {
   }) {
     return this.prisma.issue.create({
       data: {
-        ...data,
+        projectId: data.projectId,
+        featureId: data.featureId,
+        title: data.title,
+        description: data.description,
+        priority: data.priority,
+        status: data.status,
         metadata: data.metadata || {},
       },
       select: {
@@ -57,7 +62,7 @@ export class IssueService {
     })
   }
 
-  async listByProject(projectId: bigint) {
+  async listByProject(projectId: string) {
     return this.prisma.issue.findMany({
       where: { projectId },
       select: {
@@ -73,7 +78,7 @@ export class IssueService {
     })
   }
 
-  async updateStatus(id: bigint, status: string) {
+  async updateStatus(id: string, status: string) {
     return this.prisma.issue.update({
       where: { id },
       data: { status },
@@ -84,7 +89,7 @@ export class IssueService {
     })
   }
 
-  async delete(id: bigint) {
+  async delete(id: string) {
     return this.prisma.issue.delete({
       where: { id },
       select: { id: true },
