@@ -3,8 +3,11 @@ name: Build & Release Android APK
 on:
   push:
     tags:
-      - "v*.*.*"   # triggers on version tags like v1.0.0
+      - "v*.*.*"
   workflow_dispatch:
+
+permissions:
+  contents: write
 
 jobs:
   build:
@@ -15,7 +18,7 @@ jobs:
       - name: Checkout repo
         uses: actions/checkout@v4
 
-      # 🟢 Node (Capacitor requires >=22)
+      # 🟢 Node
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
@@ -35,15 +38,15 @@ jobs:
       - name: Build web app
         run: pnpm --filter field-tool build
 
-      # 🤖 Setup Android SDK
+      # 🤖 Android SDK
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
 
-      # ➕ Add Android platform (safe for CI)
+      # ➕ Capacitor Android
       - name: Add Android platform
         run: |
           cd apps/field-tool
-          npx cap add android
+          npx cap add android || true
 
       # ⚡ Sync Capacitor
       - name: Sync Capacitor
@@ -51,15 +54,15 @@ jobs:
           cd apps/field-tool
           npx cap sync android
 
-      # ☕ Setup Java (Gradle 8+ compatible)
+      # ☕ Java
       - name: Setup Java
         uses: actions/setup-java@v4
         with:
-          distribution: 'temurin'
-          java-version: '21'
+          distribution: temurin
+          java-version: 21
           cache: gradle
 
-      # 🧠 Force Gradle Java config
+      # 🧠 Fix Gradle Java
       - name: Configure Gradle Java
         run: |
           echo "org.gradle.java.home=$JAVA_HOME_21_X64" >> apps/field-tool/android/gradle.properties
@@ -71,14 +74,20 @@ jobs:
           chmod +x gradlew
           ./gradlew assembleDebug
 
-      # 🔍 Debug APK location (helps if something breaks)
+      # 🔍 DEBUG: show where APK actually is
       - name: Locate APK
         run: find . -name "*.apk"
 
-      # 🚀 Create GitHub Release + upload APK (DOWNLOAD BUTTON HERE)
+      # 📦 Upload Artifact (THIS is what shows in Actions tab)
+      - name: Upload APK Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: field-tool-apk
+          path: "**/app-debug.apk"
+
+      # 🚀 GitHub Release (THIS gives download button)
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          files: apps/field-tool/android/app/build/outputs/apk/debug/app-debug.apk
+          files: "**/app-debug.apk"
           generate_release_notes: true
-        
