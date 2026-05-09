@@ -17,7 +17,7 @@ if (!API_BASE_URL || API_BASE_URL === "undefined") {
 
 export const apiClient = axios.create({
   baseURL: API_BASE_URL || "https://ktda-power-api.onrender.com", // Fallback for safety
-  timeout: 30000, // 30 second timeout
+  timeout: 60000, // 60 second timeout (increased for Render cold starts)
   withCredentials: false, // Don't send credentials for cross-origin requests
 })
 

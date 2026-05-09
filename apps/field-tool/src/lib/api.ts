@@ -1,7 +1,10 @@
-const API_BASE_URL = import.meta.env.VITE_API_URL
+const API_BASE_URL = import.meta.env.VITE_API_URL || "https://ktda-power-api.onrender.com"
 
 // CRITICAL: Log the environment variable immediately
 console.log("[ApiClient] VITE_API_URL at runtime:", API_BASE_URL)
+if (import.meta.env.VITE_API_URL === "https://ktda-power.onrender.com") {
+  console.warn("[ApiClient] WARNING: Using deprecated API URL. Please update VITE_API_URL to https://ktda-power-api.onrender.com")
+}
 console.log("[ApiClient] All env vars:", import.meta.env)
 
 // Validate that API URL is set
@@ -25,9 +28,14 @@ export class ApiClient {
     endpoint: string,
     options: FetchOptions = {}
   ): Promise<T> {
-    const url = `${API_BASE_URL}${endpoint}`
+    const cleanBaseUrl = API_BASE_URL.endsWith("/")
+      ? API_BASE_URL.slice(0, -1)
+      : API_BASE_URL
+    const cleanEndpoint = endpoint.startsWith("/") ? endpoint : `/${endpoint}`
+    const url = `${cleanBaseUrl}${cleanEndpoint}`
+
     const token = localStorage.getItem("authToken")
-    const timeout = options.timeout || 30000 // 30 second timeout
+    const timeout = options.timeout || 60000 // 60 second timeout (increased for Render cold starts)
 
     const headers: Record<string, string> = {
       "Content-Type": "application/json",
@@ -98,7 +106,7 @@ export class ApiClient {
 
         if (err.name === "AbortError") {
           throw new Error(
-            "Request timeout. Server is not responding. Please check your connection."
+            "Request timeout. The server is taking too long to respond. This is common on Render Free tier during 'cold start'. Please wait a few seconds and try again."
           )
         }
         throw new Error(
