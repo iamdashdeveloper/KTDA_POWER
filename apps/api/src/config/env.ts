@@ -29,7 +29,7 @@ export const env = {
   // CORS - Add production URLs
   CORS_ORIGIN: getEnv(
     "CORS_ORIGIN",
-    "http://localhost:5173,http://localhost:5175,http://localhost:3000,https://ktda-power.onrender.com,https://*.onrender.com,https://ktda-power-admin-web.vercel.app/,https://ktda-power-web-portal.vercel.app/"
+    "http://localhost:5173,http://localhost:5175,http://localhost:3000,https://ktda-power.onrender.com,https://*.onrender.com,https://ktda-power-admin-web.vercel.app,https://ktda-power-web-portal.vercel.app"
   ),
 }
 
