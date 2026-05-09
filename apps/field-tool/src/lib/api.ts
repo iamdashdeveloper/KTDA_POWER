@@ -15,6 +15,11 @@ interface FetchOptions extends RequestInit {
   timeout?: number
 }
 
+// Retry configuration
+let retryCount: Record<string, number> = {}
+const MAX_RETRIES = 3
+const RETRY_DELAY = 1000 // ms
+
 export class ApiClient {
   static async request<T>(
     endpoint: string,
@@ -39,6 +44,9 @@ export class ApiClient {
     const controller = new AbortController()
     const timeoutId = setTimeout(() => controller.abort(), timeout)
 
+    const requestKey = `${options.method || "GET"}:${endpoint}`
+    const currentRetry = retryCount[requestKey] || 0
+
     try {
       const response = await fetch(url, {
         ...options,
@@ -46,6 +54,9 @@ export class ApiClient {
         credentials: "omit", // Don't send credentials for cross-origin requests
         signal: controller.signal,
       })
+
+      // Reset retry count on success
+      retryCount[requestKey] = 0
 
       if (!response.ok) {
         console.error(`[ApiClient] Request failed with status ${response.status}: ${url}`)
@@ -65,16 +76,31 @@ export class ApiClient {
       console.error("[ApiClient] Request error:", {
         error: err.message,
         code: err.code,
+        name: err.name,
         url: url,
         baseURL: API_BASE_URL,
+        retry: currentRetry,
       })
 
-      if (err.name === "AbortError") {
-        throw new Error(
-          "Request timeout. Server is not responding. Please check your connection."
-        )
-      }
-      if (err instanceof TypeError && err.message.includes("Failed to fetch")) {
+      // Retry logic for network errors
+      if (
+        err.name === "AbortError" ||
+        (err instanceof TypeError && err.message.includes("Failed to fetch"))
+      ) {
+        if (currentRetry < MAX_RETRIES) {
+          retryCount[requestKey] = currentRetry + 1
+          console.warn(
+            `[ApiClient] Network error, retrying... (${currentRetry + 1}/${MAX_RETRIES})`
+          )
+          await new Promise((resolve) => setTimeout(resolve, RETRY_DELAY))
+          return this.request<T>(endpoint, options)
+        }
+
+        if (err.name === "AbortError") {
+          throw new Error(
+            "Request timeout. Server is not responding. Please check your connection."
+          )
+        }
         throw new Error(
           `Network error. API URL: ${API_BASE_URL}. Please check your connection and ensure the API server is accessible.`
         )
