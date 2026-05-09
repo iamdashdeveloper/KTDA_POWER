@@ -2,6 +2,7 @@ const API_BASE_URL = import.meta.env.VITE_API_URL
 
 interface FetchOptions extends RequestInit {
   headers?: Record<string, string>
+  timeout?: number
 }
 
 export class ApiClient {
@@ -11,6 +12,7 @@ export class ApiClient {
   ): Promise<T> {
     const url = `${API_BASE_URL}${endpoint}`
     const token = localStorage.getItem("authToken")
+    const timeout = options.timeout || 30000 // 30 second timeout
 
     const headers: Record<string, string> = {
       "Content-Type": "application/json",
@@ -22,20 +24,48 @@ export class ApiClient {
     }
 
     console.log(`[ApiClient] ${options.method || 'GET'} ${url}`)
-    const response = await fetch(url, {
-      ...options,
-      headers,
-      credentials: "include",
-    })
 
-    if (!response.ok) {
-      console.error(`[ApiClient] Request failed with status ${response.status}: ${url}`)
-      const error = await response.json().catch(() => ({}))
-      console.error(`[ApiClient] Error details:`, error)
-      throw new Error(error.error || error.message || "Request failed")
+    // Create abort controller for timeout
+    const controller = new AbortController()
+    const timeoutId = setTimeout(() => controller.abort(), timeout)
+
+    try {
+      const response = await fetch(url, {
+        ...options,
+        headers,
+        credentials: "include",
+        signal: controller.signal,
+      })
+
+      if (!response.ok) {
+        console.error(`[ApiClient] Request failed with status ${response.status}: ${url}`)
+        const error = await response.json().catch(() => ({}))
+        console.error(`[ApiClient] Error details:`, error)
+
+        if (response.status === 401) {
+          localStorage.removeItem("authToken")
+          window.location.href = "/login"
+        }
+
+        throw new Error(error.error || error.message || "Request failed")
+      }
+
+      return response.json()
+    } catch (err: any) {
+      if (err.name === "AbortError") {
+        throw new Error(
+          "Request timeout. Server is not responding. Please check your connection."
+        )
+      }
+      if (err instanceof TypeError && err.message.includes("Failed to fetch")) {
+        throw new Error(
+          "Network error. Please check your connection and ensure the API server is accessible."
+        )
+      }
+      throw err
+    } finally {
+      clearTimeout(timeoutId)
     }
-
-    return response.json()
   }
 
   static get<T>(endpoint: string, options?: FetchOptions) {

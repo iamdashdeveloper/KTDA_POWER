@@ -26,8 +26,11 @@ export const env = {
   ),
   JWT_EXPIRATION: getEnv("JWT_EXPIRATION", "7d"),
 
-  // CORS
-  CORS_ORIGIN: getEnv("CORS_ORIGIN", "http://localhost:5173,http://localhost:5175"),
+  // CORS - Add production URLs
+  CORS_ORIGIN: getEnv(
+    "CORS_ORIGIN",
+    "http://localhost:5173,http://localhost:5175,http://localhost:3000,https://ktda-power.onrender.com,https://*.onrender.com,https://ktda-power-admin-web.vercel.app/,"
+  ),
 }
 
 export default env

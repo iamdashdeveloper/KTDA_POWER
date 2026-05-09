@@ -28,10 +28,15 @@ export function Dashboard() {
   const [userPositions, setUserPositions] = useState<
     Array<{ x: string; y: number }>
   >([])
+  const [error, setError] = useState<string | null>(null)
+  const [isLoading, setIsLoading] = useState(true)
 
   useEffect(() => {
     const fetchDashboardData = async () => {
       try {
+        setError(null)
+        setIsLoading(true)
+
         // Fetch projects
         const projectsRes = await apiClient.get("/projects")
         const projects = Array.isArray(projectsRes.data)
@@ -68,8 +73,13 @@ export function Dashboard() {
           })
         )
         setUserPositions(chartData)
-      } catch (error) {
-        console.error("Error fetching dashboard data:", error)
+        setIsLoading(false)
+      } catch (err) {
+        const errorMessage =
+          err instanceof Error ? err.message : "Failed to fetch dashboard data"
+        console.error("Error fetching dashboard data:", err)
+        setError(errorMessage)
+        setIsLoading(false)
       }
     }
 
@@ -85,33 +95,50 @@ export function Dashboard() {
         </p>
       </div>
 
-      {/* Stat Cards */}
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-        <StatCard
-          title="Total Projects"
-          value={stats.projects}
-          icon={Briefcase}
-          description="Active projects across all companies"
-        />
-        <StatCard
-          title="Total Companies"
-          value={stats.companies}
-          icon={Building2}
-          description="Registered companies in the system"
-        />
-        <StatCard
-          title="Total Users"
-          value={stats.users}
-          icon={Users}
-          description="Team members and staff"
-        />
-      </div>
+      {error && (
+        <div className="rounded-md bg-red-50 p-4 text-red-800 dark:bg-red-950 dark:text-red-200">
+          <p className="font-semibold">Error loading dashboard</p>
+          <p className="text-sm">{error}</p>
+        </div>
+      )}
 
-      {/* Charts and Grid */}
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
-        <UserPositionChart data={userPositions} />
-        <ProjectsTable projects={projectsData} />
-      </div>
+      {isLoading && (
+        <div className="text-center text-muted-foreground">
+          Loading dashboard data...
+        </div>
+      )}
+
+      {!isLoading && !error && (
+        <>
+          {/* Stat Cards */}
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+            <StatCard
+              title="Total Projects"
+              value={stats.projects}
+              icon={Briefcase}
+              description="Active projects across all companies"
+            />
+            <StatCard
+              title="Total Companies"
+              value={stats.companies}
+              icon={Building2}
+              description="Registered companies in the system"
+            />
+            <StatCard
+              title="Total Users"
+              value={stats.users}
+              icon={Users}
+              description="Team members and staff"
+            />
+          </div>
+
+          {/* Charts and Grid */}
+          <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+            <UserPositionChart data={userPositions} />
+            <ProjectsTable projects={projectsData} />
+          </div>
+        </>
+      )}
     </div>
   )
 }

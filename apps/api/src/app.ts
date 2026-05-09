@@ -45,9 +45,36 @@ export async function createApp() {
 
   // Register plugins
   await fastify.register(cors, {
-    origin: env.CORS_ORIGIN.split(","),
+    origin: (origin, callback) => {
+      const corsOrigins = env.CORS_ORIGIN.split(",").map((o) => o.trim())
+
+      // Allow requests with no origin (same-origin requests)
+      if (!origin) {
+        return callback(null, true)
+      }
+
+      // Check if origin is in allowed list
+      const isAllowed = corsOrigins.some((allowed) => {
+        if (allowed === "*") return true
+        // Support wildcard subdomains like *.onrender.com
+        if (allowed.startsWith("*.")) {
+          const domain = allowed.substring(2)
+          return origin.endsWith("." + domain) || origin.endsWith(domain)
+        }
+        return origin === allowed
+      })
+
+      if (isAllowed) {
+        callback(null, true)
+      } else {
+        console.warn(`[CORS] Rejected origin: ${origin}`)
+        callback(new Error("CORS not allowed"), false)
+      }
+    },
     methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     credentials: true,
+    allowedHeaders: ["Content-Type", "Authorization"],
+    exposedHeaders: ["Content-Length"],
   })
 
   // Add content-type parser for binary image data
