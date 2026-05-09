@@ -51,6 +51,20 @@ export async function createApp() {
     .map((o) => o.trim())
     .filter(Boolean)
 
+  // Helper to check if origin is allowed (handles wildcards)
+  const isOriginAllowed = (origin: string): boolean => {
+    return allowedOrigins.some((allowed) => {
+      if (allowed === "*") return true
+      // Handle wildcards like https://*.onrender.com
+      if (allowed.includes("*")) {
+        const pattern = allowed.replace(/\./g, "\\.").replace(/\*/g, "[^/]+")
+        const regex = new RegExp(`^${pattern}$`)
+        return regex.test(origin)
+      }
+      return origin === allowed
+    })
+  }
+
   await fastify.register(cors, {
     origin: (origin, callback) => {
       console.log(`[CORS] Request from: ${origin || "same-origin"}`)
@@ -58,12 +72,7 @@ export async function createApp() {
       // allow server-to-server / mobile apps / curl
       if (!origin) return callback(null, true)
 
-      const isAllowed = allowedOrigins.some((allowed) => {
-        if (allowed === "*") return true
-        return origin === allowed
-      })
-
-      if (isAllowed) {
+      if (isOriginAllowed(origin)) {
         return callback(null, true)
       }
 
