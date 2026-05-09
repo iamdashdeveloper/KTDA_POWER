@@ -24,14 +24,10 @@ import {
   LayoutDashboard,
   Users,
   Lock,
-  FolderOpen,
   Building,
   Plus,
   Edit,
   Trash2,
-  SettingsIcon,
-  FileText,
-  AlertCircle,
 } from "lucide-react"
 import { BsGeo } from "react-icons/bs"
 import DefaultLoader from "@/components/Logo"

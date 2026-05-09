@@ -1,5 +1,4 @@
 import { Card } from "@workspace/ui/components/card"
-import type { ReactNode } from "react"
 
 interface StatCardProps {
   title: string

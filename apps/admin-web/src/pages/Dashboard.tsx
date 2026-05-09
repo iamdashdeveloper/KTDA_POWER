@@ -27,13 +27,10 @@ export function Dashboard() {
   const [userPositions, setUserPositions] = useState<
     Array<{ x: string; y: number }>
   >([])
-  const [loading, setLoading] = useState(true)
 
   useEffect(() => {
     const fetchDashboardData = async () => {
       try {
-        setLoading(true)
-
         // Fetch projects
         const projectsRes = await fetch("http://localhost:3001/projects")
         const projectsJson = await projectsRes.json()
@@ -75,8 +72,6 @@ export function Dashboard() {
         setUserPositions(chartData)
       } catch (error) {
         console.error("Error fetching dashboard data:", error)
-      } finally {
-        setLoading(false)
       }
     }
 

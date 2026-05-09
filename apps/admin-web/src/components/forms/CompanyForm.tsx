@@ -10,7 +10,6 @@ import {
   type CompanyFormData,
 } from "@workspace/ui/validations"
 import { JsonMetadataEditor } from "./JsonMetadataEditor"
-import { GeometryPicker } from "./GeometryPicker"
 import { ImageUploader } from "../ImageUploader"
 import { handleFormError, handleFormSuccess } from "@/lib/errorHandler"
 import apiClient from "@/lib/api"
@@ -33,16 +32,15 @@ export function CompanyForm({ companyId, initialData }: CompanyFormProps) {
     setValue,
     formState: { errors },
   } = useForm<CompanyFormData>({
-    resolver: zodResolver(CompanyFormSchema),
+    resolver: zodResolver(CompanyFormSchema as any),
     defaultValues: initialData || {
       name: "",
       description: "",
-      location: { latitude: -1.283611, longitude: 36.818611 },
       metadata: {},
+      images: [],
     },
   })
 
-  const location = watch("location")
   const metadata = watch("metadata")
 
   const onSubmit = async (data: CompanyFormData) => {
@@ -52,7 +50,6 @@ export function CompanyForm({ companyId, initialData }: CompanyFormProps) {
       const payload = {
         name: data.name,
         description: data.description,
-        location: location,
         metadata: metadata,
         images: images,
       }
@@ -72,7 +69,6 @@ export function CompanyForm({ companyId, initialData }: CompanyFormProps) {
         // Reset form
         setValue("name", "")
         setValue("description", "")
-        setValue("location", { latitude: -1.283611, longitude: 36.818611 })
         setValue("metadata", {})
         setImages([])
       }
@@ -97,7 +93,7 @@ export function CompanyForm({ companyId, initialData }: CompanyFormProps) {
         {isEditMode ? "Edit Company" : "Create Company"}
       </h1>
 
-      <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
+      <form onSubmit={handleSubmit(onSubmit as any)} className="space-y-6">
         {/* Basic Information */}
         <Card className="p-6">
           <h2 className="mb-4 text-lg font-semibold">Basic Information</h2>
@@ -147,13 +143,6 @@ export function CompanyForm({ companyId, initialData }: CompanyFormProps) {
             maxImages={10}
           />
         </Card>
-
-        {/* Location */}
-        <GeometryPicker
-          value={location}
-          onChange={(coords) => setValue("location", coords)}
-          title="Company Headquarters Location"
-        />
 
         {/* Company Metadata */}
         <JsonMetadataEditor

@@ -6,7 +6,6 @@ import { Input } from "@workspace/ui/components/input"
 import { Card } from "@workspace/ui/components/card"
 import { IssueFormSchema, type IssueFormData } from "@workspace/ui/validations"
 import { JsonMetadataEditor } from "./JsonMetadataEditor"
-import { GeometryPicker } from "./GeometryPicker"
 import { handleFormError, handleFormSuccess } from "@/lib/errorHandler"
 import axios from "axios"
 
@@ -34,7 +33,7 @@ export function IssueForm() {
     setValue,
     formState: { errors },
   } = useForm<IssueFormData>({
-    resolver: zodResolver(IssueFormSchema),
+    resolver: zodResolver(IssueFormSchema as any),
     defaultValues: {
       title: "",
       description: "",
@@ -42,14 +41,12 @@ export function IssueForm() {
       featureId: "",
       priority: 0,
       status: "OPEN",
-      location: undefined,
       metadata: {},
       images: [],
     },
   })
 
   const projectId = watch("projectId")
-  const location = watch("location")
   const metadata = watch("metadata")
 
   // Fetch projects on mount
@@ -113,7 +110,6 @@ export function IssueForm() {
       setValue("featureId", "")
       setValue("priority", 0)
       setValue("status", "OPEN")
-      setValue("location", undefined)
       setValue("metadata", {})
       setValue("images", [])
     } catch (err) {
@@ -127,7 +123,7 @@ export function IssueForm() {
     <div className="p-6">
       <h1 className="mb-6 text-3xl font-bold">Report Issue</h1>
 
-      <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
+      <form onSubmit={handleSubmit(onSubmit as any)} className="space-y-6">
         {/* Basic Information */}
         <Card className="p-6">
           <h2 className="mb-4 text-lg font-semibold">Basic Information</h2>
@@ -280,13 +276,6 @@ export function IssueForm() {
             </div>
           </div>
         </Card>
-
-        {/* Location */}
-        <GeometryPicker
-          value={location}
-          onChange={(coords) => setValue("location", coords)}
-          title="Issue Location"
-        />
 
         {/* Issue Metadata */}
         <JsonMetadataEditor

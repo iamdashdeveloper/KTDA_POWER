@@ -1,8 +1,7 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { ChevronDown, Loader2, AlertCircle } from "lucide-react"
-import { Button } from "@workspace/ui/components/button"
+import { Loader2, AlertCircle } from "lucide-react"
 import { Card } from "@workspace/ui/components/card"
 import {
   Select,

@@ -87,7 +87,20 @@ export function CompanyDetail() {
       </Button>
 
       {isEditMode ? (
-        <CompanyForm companyId={id} initialData={company} />
+        <CompanyForm
+          companyId={id}
+          initialData={
+            company
+              ? {
+                  id: company.id,
+                  name: company.name,
+                  description: company.description || "",
+                  metadata: company.metadata || {},
+                  images: company.images || [],
+                }
+              : undefined
+          }
+        />
       ) : (
         <ArticleView
           title={company.name}

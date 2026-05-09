@@ -103,7 +103,23 @@ export function ProjectDetail() {
               Cancel
             </Button>
           </div>
-          <ProjectForm projectId={id} initialData={project} />
+          <ProjectForm
+            projectId={id}
+            initialData={
+              project
+                ? {
+                    id: project.id,
+                    name: project.name,
+                    companyId: project.companyId,
+                    description: project.description || "",
+                    metadata: project.metadata || {},
+                    status: project.status || "",
+                    images: project.images || [],
+                    location: project.location,
+                  }
+                : undefined
+            }
+          />
         </div>
       )}
     </div>

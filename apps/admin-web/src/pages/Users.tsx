@@ -48,12 +48,6 @@ interface UserStats {
   unverifiedUsers: number
 }
 
-interface RoleStats {
-  [key: string]: {
-    [company: string]: number
-  }
-}
-
 type SortKey = keyof User
 type SortOrder = "asc" | "desc"
 
@@ -65,7 +59,6 @@ export function Users() {
     verifiedUsers: 0,
     unverifiedUsers: 0,
   })
-  const [roleStats, setRoleStats] = useState<RoleStats>({})
 
   // Filtering & Sorting
   const [searchTerm, setSearchTerm] = useState("")
@@ -105,19 +98,6 @@ export function Users() {
           verifiedUsers: verified,
           unverifiedUsers: fetchedUsers.length - verified,
         })
-
-        // Calculate role stats (position-based)
-        const positionStats: RoleStats = {}
-        fetchedUsers.forEach((user: User) => {
-          if (!positionStats[user.position]) {
-            positionStats[user.position] = {}
-          }
-          if (!positionStats[user.position][user.company.name]) {
-            positionStats[user.position][user.company.name] = 0
-          }
-          positionStats[user.position][user.company.name]++
-        })
-        setRoleStats(positionStats)
       } catch (err) {
         handleFormError(err)
       } finally {

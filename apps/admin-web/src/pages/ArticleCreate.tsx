@@ -21,7 +21,6 @@ export function ArticleCreate() {
   const [projects, setProjects] = useState<Project[]>([])
   const [loading, setLoading] = useState(true)
   const [submitting, setSubmitting] = useState(false)
-  const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState(false)
 
   const [formData, setFormData] = useState({
@@ -50,7 +49,6 @@ export function ArticleCreate() {
         setCompanies(companiesRes.data)
         setProjects(projectsRes.data)
       } catch (err) {
-        setError(err instanceof Error ? err.message : "Failed to load data")
         handleFormError(err)
       } finally {
         setLoading(false)
@@ -107,7 +105,6 @@ export function ArticleCreate() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    setError(null)
     setSuccess(false)
 
     try {
@@ -134,7 +131,6 @@ export function ArticleCreate() {
       setTimeout(() => setSuccess(false), 3000)
     } catch (err) {
       handleFormError(err)
-      setError(err instanceof Error ? err.message : "Failed to create article")
     } finally {
       setSubmitting(false)
     }

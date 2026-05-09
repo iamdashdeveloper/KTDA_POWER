@@ -16,7 +16,7 @@ interface UserPositionChartProps {
 }
 
 export function UserPositionChart({ data }: UserPositionChartProps) {
-  const { chartTheme, paletteColors } = useSyncfusionTheme()
+  const { chartTheme } = useSyncfusionTheme()
   const isDevice = Browser.isDevice
   const labelSize = isDevice ? "9px" : "13px"
   const connectorLength = isDevice ? "5px" : "8px"

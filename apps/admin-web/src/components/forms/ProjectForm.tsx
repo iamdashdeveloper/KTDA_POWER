@@ -17,7 +17,6 @@ import {
   type ProjectFormData,
 } from "@workspace/ui/validations"
 import { JsonMetadataEditor } from "./JsonMetadataEditor"
-import { GeometryPicker } from "./GeometryPicker"
 import { ImageUploader } from "../ImageUploader"
 import { handleFormError, handleFormSuccess } from "@/lib/errorHandler"
 import apiClient from "@/lib/api"
@@ -52,18 +51,19 @@ export function ProjectForm({ projectId, initialData }: ProjectFormProps) {
     setValue,
     formState: { errors },
   } = useForm<ProjectFormData>({
-    resolver: zodResolver(ProjectFormSchema),
+    resolver: zodResolver(ProjectFormSchema as any),
     defaultValues: initialData || {
       companyId: "",
       name: "",
       description: "",
+      status: "",
       metadata: {},
+      images: [],
     },
   })
 
-  const location = watch("location" as any)
   const metadata = watch("metadata")
-  const status = watch("status" as any)
+  const status = watch("status")
 
   // Fetch companies
   useEffect(() => {
@@ -116,9 +116,8 @@ export function ProjectForm({ projectId, initialData }: ProjectFormProps) {
         setValue("companyId", "")
         setValue("name", "")
         setValue("description", "")
-        setValue("location", undefined)
         setValue("metadata", {})
-        setValue("status", undefined)
+        setValue("status", "")
         setImages([])
       }
     } catch (err) {
@@ -142,7 +141,7 @@ export function ProjectForm({ projectId, initialData }: ProjectFormProps) {
         {isEditMode ? "Edit Project" : "Create Project"}
       </h1>
 
-      <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
+      <form onSubmit={handleSubmit(onSubmit as any)} className="space-y-6">
         {/* Basic Information */}
         <Card className="p-6">
           <h2 className="mb-4 text-lg font-semibold">Basic Information</h2>
@@ -241,13 +240,6 @@ export function ProjectForm({ projectId, initialData }: ProjectFormProps) {
             maxImages={10}
           />
         </Card>
-
-        {/* Location */}
-        <GeometryPicker
-          value={location || { latitude: -1.283611, longitude: 36.818611 }}
-          onChange={(coords) => setValue("location", coords)}
-          title="Project Location"
-        />
 
         {/* Project Metadata */}
         <JsonMetadataEditor
