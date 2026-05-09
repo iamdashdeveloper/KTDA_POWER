@@ -56,11 +56,11 @@ jobs:
         uses: actions/setup-java@v4
         with:
           distribution: 'temurin'
-          java-version: '21'
+          java-version: '24'
 
       # 🧠 Ensure Gradle uses correct Java runtime
       - name: Set JAVA_HOME
-        run: echo "JAVA_HOME=$JAVA_HOME_21_X64" >> gradle.properties
+        run: echo "JAVA_HOME=$JAVA_HOME_24_X64" >> gradle.properties
 
       # 🏗️ Build APK
       - name: Build APK
