@@ -1,9 +1,9 @@
-name: Build Android APK
+name: Build & Release Android APK
 
 on:
   push:
-    branches:
-      - main
+    tags:
+      - "v*.*.*"   # triggers on version tags like v1.0.0
   workflow_dispatch:
 
 jobs:
@@ -31,7 +31,7 @@ jobs:
       - name: Install dependencies
         run: pnpm install
 
-      # 🔨 Build ONLY your field-tool app
+      # 🔨 Build web app
       - name: Build web app
         run: pnpm --filter field-tool build
 
@@ -39,7 +39,7 @@ jobs:
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
 
-      # ➕ Add Android platform
+      # ➕ Add Android platform (safe for CI)
       - name: Add Android platform
         run: |
           cd apps/field-tool
@@ -51,16 +51,18 @@ jobs:
           cd apps/field-tool
           npx cap sync android
 
-      # ☕ Setup Java (FIXED → must match Gradle 8+ requirement)
+      # ☕ Setup Java (Gradle 8+ compatible)
       - name: Setup Java
         uses: actions/setup-java@v4
         with:
           distribution: 'temurin'
-          java-version: '24'
+          java-version: '21'
+          cache: gradle
 
-      # 🧠 Ensure Gradle uses correct Java runtime
-      - name: Set JAVA_HOME
-        run: echo "JAVA_HOME=$JAVA_HOME_24_X64" >> gradle.properties
+      # 🧠 Force Gradle Java config
+      - name: Configure Gradle Java
+        run: |
+          echo "org.gradle.java.home=$JAVA_HOME_21_X64" >> apps/field-tool/android/gradle.properties
 
       # 🏗️ Build APK
       - name: Build APK
@@ -69,9 +71,14 @@ jobs:
           chmod +x gradlew
           ./gradlew assembleDebug
 
-      # 📦 Upload APK artifact
-      - name: Upload APK
-        uses: actions/upload-artifact@v4
+      # 🔍 Debug APK location (helps if something breaks)
+      - name: Locate APK
+        run: find . -name "*.apk"
+
+      # 🚀 Create GitHub Release + upload APK (DOWNLOAD BUTTON HERE)
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
         with:
-          name: field-tool-apk
-          path: apps/field-tool/android/app/build/outputs/apk/debug/app-debug.apks
+          files: apps/field-tool/android/app/build/outputs/apk/debug/app-debug.apk
+          generate_release_notes: true
+        
