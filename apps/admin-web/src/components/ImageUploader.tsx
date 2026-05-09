@@ -40,10 +40,10 @@ export function ImageUploader({
           })
 
           if (response.data.url) {
-            setUploadedImages((prev) => [
-              ...prev,
-              `http://localhost:3001${response.data.url}`,
-            ])
+            const imageUrl = response.data.url.startsWith("http")
+              ? response.data.url
+              : `${import.meta.env.VITE_API_URL as string}${response.data.url}`
+            setUploadedImages((prev) => [...prev, imageUrl])
           }
         } catch (error) {
           console.error("Failed to upload image:", error)

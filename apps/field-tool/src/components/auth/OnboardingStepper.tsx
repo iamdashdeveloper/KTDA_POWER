@@ -34,7 +34,7 @@ export function OnboardingStepper({
   const [currentStep, setCurrentStep] = useState(0)
   const [isLoading, setIsLoading] = useState(false)
   const [apiBaseUrl] = useState(
-    import.meta.env.VITE_API_URL || "http://localhost:3001"
+    import.meta.env.VITE_API_URL as string
   )
 
   const {

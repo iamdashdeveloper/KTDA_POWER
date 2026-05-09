@@ -90,8 +90,7 @@ export function MapTriggeredIssueForm({
     for (const file of filesToProcess) {
       if (file.type.startsWith("image/")) {
         try {
-          const API_BASE_URL =
-            import.meta.env.VITE_API_URL || "http://localhost:3001"
+          const API_BASE_URL = import.meta.env.VITE_API_URL as string
           const token = localStorage.getItem("authToken")
 
           const headers: Record<string, string> = {

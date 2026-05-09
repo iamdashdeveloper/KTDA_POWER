@@ -5,6 +5,7 @@ import { Briefcase, Building2, Users } from "lucide-react"
 import { StatCard } from "../components/StatCard"
 import { UserPositionChart } from "../components/charts/UserPositionChart"
 import { ProjectsTable } from "../components/tables/ProjectsTable"
+import apiClient from "@/lib/api"
 
 interface Project {
   id: string
@@ -32,28 +33,25 @@ export function Dashboard() {
     const fetchDashboardData = async () => {
       try {
         // Fetch projects
-        const projectsRes = await fetch("http://localhost:3001/projects")
-        const projectsJson = await projectsRes.json()
-        const projects = Array.isArray(projectsJson)
-          ? projectsJson
-          : projectsJson.projects || []
+        const projectsRes = await apiClient.get("/projects")
+        const projects = Array.isArray(projectsRes.data)
+          ? projectsRes.data
+          : projectsRes.data.projects || []
         setStats((prev) => ({ ...prev, projects: projects.length }))
         setProjectsData(projects.slice(0, 10))
 
         // Fetch companies
-        const companiesRes = await fetch("http://localhost:3001/companies")
-        const companiesJson = await companiesRes.json()
-        const companies = Array.isArray(companiesJson)
-          ? companiesJson
-          : companiesJson.companies || []
+        const companiesRes = await apiClient.get("/companies")
+        const companies = Array.isArray(companiesRes.data)
+          ? companiesRes.data
+          : companiesRes.data.companies || []
         setStats((prev) => ({ ...prev, companies: companies.length }))
 
         // Fetch users
-        const usersRes = await fetch("http://localhost:3001/users")
-        const usersJson = await usersRes.json()
-        const users = Array.isArray(usersJson)
-          ? usersJson
-          : usersJson.users || []
+        const usersRes = await apiClient.get("/users")
+        const users = Array.isArray(usersRes.data)
+          ? usersRes.data
+          : usersRes.data.users || []
         setStats((prev) => ({ ...prev, users: users.length }))
 
         // Process user positions for donut chart

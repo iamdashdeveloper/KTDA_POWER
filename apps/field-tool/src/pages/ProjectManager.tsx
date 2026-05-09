@@ -19,7 +19,7 @@ export default function ProjectManager() {
   const [selectedProject, setSelectedProject] = useState<string | null>(null)
   const [user, setUser] = useState<any>(null)
   const [apiBaseUrl] = useState(
-    import.meta.env.VITE_API_URL || "http://localhost:3001"
+    import.meta.env.VITE_API_URL as string
   )
 
   // Fetch user and projects on mount

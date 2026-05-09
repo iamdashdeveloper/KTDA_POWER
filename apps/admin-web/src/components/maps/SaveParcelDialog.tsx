@@ -12,6 +12,7 @@ import { Input } from "@workspace/ui/components/input"
 import { Label } from "@workspace/ui/components/label"
 import { Textarea } from "@workspace/ui/components/textarea"
 import { Loader2 } from "lucide-react"
+import apiClient from "@/lib/api"
 
 interface SaveParcelDialogProps {
   open: boolean
@@ -62,11 +63,10 @@ export function SaveParcelDialog({
     if (!formData.ownerEmail) return
 
     try {
-      const response = await fetch(
-        `http://localhost:3001/owners?email=${formData.ownerEmail}`
-      )
-      const data = await response.json()
-      setOwnerExists(data.owners && data.owners.length > 0)
+      const response = await apiClient.get("/owners", {
+        params: { email: formData.ownerEmail },
+      })
+      setOwnerExists(response.data.owners && response.data.owners.length > 0)
     } catch (error) {
       console.error("Error checking email:", error)
     }

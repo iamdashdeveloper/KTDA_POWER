@@ -6,9 +6,9 @@
  */
 
 export const API_CONFIG = {
-  // Use /api proxy path (configured in vite.config.ts)
-  // In production, set VITE_API_URL to full URL or use relative path
-  baseUrl: import.meta.env.VITE_API_URL || "/api",
+  // Use environment variable for API URL
+  // In production, set VITE_API_URL to full URL
+  baseUrl: import.meta.env.VITE_API_URL as string,
   timeout: 10000, // 10 seconds
 }
 
