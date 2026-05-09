@@ -94,7 +94,6 @@ export function ProjectForm({ projectId, initialData }: ProjectFormProps) {
         name: data.name,
         description: data.description,
         companyId: data.companyId,
-        location: location,
         metadata: metadata,
         status: status,
         images: images,

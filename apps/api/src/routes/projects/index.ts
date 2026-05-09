@@ -166,6 +166,17 @@ export async function projectsRoutes(fastify: FastifyInstance) {
           location,
         } = request.body
 
+        // Log incoming request for debugging
+        console.log("[POST /projects] Incoming request body:", {
+          name,
+          description,
+          companyId,
+          metadata,
+          status,
+          images,
+          location,
+        })
+
         if (!name || name.trim().length === 0) {
           return reply.status(400).send({
             error: "Project name is required",
@@ -214,6 +225,7 @@ export async function projectsRoutes(fastify: FastifyInstance) {
 
         return reply.status(201).send(mapProjectRow(createdProject))
       } catch (error) {
+        console.error("[POST /projects] Error creating project:", error)
         reply.status(500).send({
           error: "Failed to create project",
           message: error instanceof Error ? error.message : "Unknown error",

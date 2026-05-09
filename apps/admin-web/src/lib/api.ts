@@ -124,6 +124,15 @@ apiClient.interceptors.response.use(
       return Promise.reject(new Error("Resource not found."))
     }
 
+    // Handle bad request errors - include response data
+    if (error.response?.status === 400) {
+      const errorData = error.response?.data as any
+      console.error("[API] Bad Request (400) Details:", errorData)
+      const errorMsg =
+        errorData?.error || errorData?.message || "Invalid request"
+      return Promise.reject(new Error(`Bad request: ${errorMsg}`))
+    }
+
     // Handle server errors
     if (error.response?.status && error.response?.status >= 500) {
       console.error("[API] Server error:", error.response?.data)
