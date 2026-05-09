@@ -27,7 +27,7 @@ jobs:
         with:
           version: 9
 
-      # 📦 Install deps
+      # 📦 Install dependencies
       - name: Install dependencies
         run: pnpm install
 
@@ -35,11 +35,11 @@ jobs:
       - name: Build web app
         run: pnpm --filter field-tool build
 
-      # 🤖 Setup Android SDK (CRITICAL)
+      # 🤖 Setup Android SDK
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
 
-      # ➕ Add Android platform (FIX)
+      # ➕ Add Android platform
       - name: Add Android platform
         run: |
           cd apps/field-tool
@@ -51,12 +51,16 @@ jobs:
           cd apps/field-tool
           npx cap sync android
 
-      # ☕ Java (Gradle needs it)
+      # ☕ Setup Java (FIXED → must match Gradle 8+ requirement)
       - name: Setup Java
         uses: actions/setup-java@v4
         with:
           distribution: 'temurin'
-          java-version: '17'
+          java-version: '21'
+
+      # 🧠 Ensure Gradle uses correct Java runtime
+      - name: Set JAVA_HOME
+        run: echo "JAVA_HOME=$JAVA_HOME_21_X64" >> $GITHUB_ENV
 
       # 🏗️ Build APK
       - name: Build APK
@@ -65,9 +69,9 @@ jobs:
           chmod +x gradlew
           ./gradlew assembleDebug
 
-      # 📦 Upload APK
+      # 📦 Upload APK artifact
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
           name: field-tool-apk
-          path: apps/field-tool/android/app/build/outputs/apk/debug/app-debug.apk
+          path: apps/field-tool/android/app/build/outputs/apk/debug/app-debug.apks
