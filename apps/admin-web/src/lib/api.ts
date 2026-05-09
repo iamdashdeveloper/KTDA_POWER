@@ -1,9 +1,22 @@
 import axios, { AxiosError } from "axios"
 
+// CRITICAL: Log the environment variable immediately
 const API_BASE_URL = import.meta.env.VITE_API_URL
+console.log("[API] VITE_API_URL at runtime:", API_BASE_URL)
+console.log("[API] All env vars:", import.meta.env)
+
+// Validate that API URL is set
+if (!API_BASE_URL || API_BASE_URL === "undefined") {
+  console.error(
+    "[API] ERROR: VITE_API_URL is not defined! API calls will fail."
+  )
+  console.error(
+    "[API] Make sure VITE_API_URL is set in .env or environment variables"
+  )
+}
 
 export const apiClient = axios.create({
-  baseURL: API_BASE_URL,
+  baseURL: API_BASE_URL || "https://ktda-power.onrender.com", // Fallback for safety
   timeout: 30000, // 30 second timeout
   withCredentials: true, // Send cookies with requests
 })
@@ -14,6 +27,8 @@ apiClient.interceptors.request.use((config) => {
   if (token) {
     config.headers.Authorization = `Bearer ${token}`
   }
+  // Log the actual URL being called
+  console.log(`[API] ${config.method?.toUpperCase()} ${config.url}`)
   return config
 })
 
@@ -21,6 +36,18 @@ apiClient.interceptors.request.use((config) => {
 apiClient.interceptors.response.use(
   (response) => response,
   (error: AxiosError) => {
+    // Log the full error for debugging
+    console.error("[API] Full error object:", {
+      message: error.message,
+      code: error.code,
+      status: error.response?.status,
+      config: {
+        url: error.config?.url,
+        baseURL: error.config?.baseURL,
+        method: error.config?.method,
+      },
+    })
+
     // Handle specific error scenarios
     if (error.code === "ECONNABORTED") {
       console.error("[API] Request timeout - server may be unresponsive")
@@ -31,11 +58,15 @@ apiClient.interceptors.response.use(
 
     if (!error.response) {
       // Network error or CORS error
-      console.error("[API] Network Error:", error.message)
+      console.error("[API] Network Error Details:", {
+        message: error.message,
+        code: error.code,
+        baseURL: API_BASE_URL,
+      })
       if (error.message.includes("Network Error")) {
         return Promise.reject(
           new Error(
-            "Network error. Please check your connection and the API server."
+            `Network error. API URL: ${API_BASE_URL}. Please check your connection and the API server.`
           )
         )
       }
@@ -62,7 +93,7 @@ apiClient.interceptors.response.use(
     }
 
     // Handle server errors
-    if (error.response?.status >= 500) {
+    if (error.response?.status && error.response?.status >= 500) {
       console.error("[API] Server error:", error.response?.data)
       return Promise.reject(new Error("Server error. Please try again later."))
     }

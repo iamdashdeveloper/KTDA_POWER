@@ -31,6 +31,7 @@ import complaintsRoutes from "./routes/complaints/index.js"
 import feedbackRoutes from "./routes/feedback/index.js"
 import { hydroModelsRoutes } from "./routes/hydro-models/index.js"
 import { ussdService } from "./services/ussdService.js"
+
 import { fileURLToPath } from "url"
 import path from "path"
 
@@ -40,56 +41,49 @@ const __dirname = path.dirname(__filename)
 export async function createApp() {
   const fastify = Fastify({
     logger: env.NODE_ENV === "development",
-    bodyLimit: 52428800, // 50MB limit for file uploads
+    bodyLimit: 52428800,
   })
 
-  // Register plugins
+  // =========================
+  // CORS (SINGLE SOURCE OF TRUTH)
+  // =========================
+  const allowedOrigins = env.CORS_ORIGIN.split(",")
+    .map((o) => o.trim())
+    .filter(Boolean)
+
   await fastify.register(cors, {
     origin: (origin, callback) => {
-      const corsOrigins = env.CORS_ORIGIN.split(",").map((o) => o.trim())
+      console.log(`[CORS] Request from: ${origin || "same-origin"}`)
 
-      // Allow requests with no origin (same-origin requests)
-      if (!origin) {
-        return callback(null, true)
-      }
+      // allow server-to-server / mobile apps / curl
+      if (!origin) return callback(null, true)
 
-      // Check if origin is in allowed list
-      const isAllowed = corsOrigins.some((allowed) => {
+      const isAllowed = allowedOrigins.some((allowed) => {
         if (allowed === "*") return true
-        // Support wildcard subdomains like *.onrender.com
-        if (allowed.startsWith("*.")) {
-          const domain = allowed.substring(2)
-          return origin.endsWith("." + domain) || origin.endsWith(domain)
-        }
         return origin === allowed
       })
 
       if (isAllowed) {
-        callback(null, true)
-      } else {
-        console.warn(`[CORS] Rejected origin: ${origin}`)
-        callback(new Error("CORS not allowed"), false)
+        return callback(null, true)
       }
+
+      console.warn(`[CORS] Blocked origin: ${origin}`)
+      return callback(new Error("Not allowed by CORS"), false)
     },
     methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     credentials: true,
     allowedHeaders: ["Content-Type", "Authorization"],
-    exposedHeaders: ["Content-Length"],
   })
 
-  // Add content-type parser for binary image data
-  fastify.addContentTypeParser(
-    "image/*",
-    async (request: any, payload: any) => {
-      const chunks: Buffer[] = []
-      for await (const chunk of payload) {
-        chunks.push(chunk)
-      }
-      return Buffer.concat(chunks)
-    }
-  )
+  // =========================
+  // BODY PARSERS
+  // =========================
+  fastify.addContentTypeParser("image/*", async (_req: any, payload: any) => {
+    const chunks: Buffer[] = []
+    for await (const chunk of payload) chunks.push(chunk)
+    return Buffer.concat(chunks)
+  })
 
-  // Also register specific image types for better compatibility
   const imageTypes = [
     "image/jpeg",
     "image/jpg",
@@ -97,19 +91,18 @@ export async function createApp() {
     "image/gif",
     "image/webp",
   ]
-  for (const imageType of imageTypes) {
-    fastify.addContentTypeParser(
-      imageType,
-      async (request: any, payload: any) => {
-        const chunks: Buffer[] = []
-        for await (const chunk of payload) {
-          chunks.push(chunk)
-        }
-        return Buffer.concat(chunks)
-      }
-    )
+
+  for (const type of imageTypes) {
+    fastify.addContentTypeParser(type, async (_req: any, payload: any) => {
+      const chunks: Buffer[] = []
+      for await (const chunk of payload) chunks.push(chunk)
+      return Buffer.concat(chunks)
+    })
   }
 
+  // =========================
+  // CORE PLUGINS
+  // =========================
   await fastify.register(jwt, {
     secret: env.JWT_SECRET,
   })
@@ -117,33 +110,55 @@ export async function createApp() {
   await fastify.register(cookie)
 
   await fastify.register(multipart, {
-    limits: {
-      fileSize: 52428800, // 50MB limit for file uploads
-    },
+    limits: { fileSize: 52428800 },
   })
 
   await fastify.register(prismPlugin)
   await fastify.register(errorHandler)
   await fastify.register(authPlugin)
 
-  // Register static file serving for uploads
+  // =========================
+  // STATIC FILES
+  // =========================
   try {
     const publicPath = path.join(__dirname, "../public")
+
     await fastify.register(staticPlugin, {
       root: publicPath,
       prefix: "/",
     })
-  } catch (err) {
-    // Directory might not exist yet, that's okay
-    console.log("Public directory not found, will be created on first upload")
+  } catch {
+    console.log("Public directory not found")
   }
 
-  // Health check
+  // =========================
+  // HEALTH / DEBUG
+  // =========================
   fastify.get("/health", async () => {
     return { status: "ok", timestamp: new Date().toISOString() }
   })
 
-  // Register all routes
+  fastify.get("/debug", async (request) => {
+    return {
+      status: "ok",
+      timestamp: new Date().toISOString(),
+      environment: {
+        NODE_ENV: env.NODE_ENV,
+        PORT: env.PORT,
+        HOST: env.HOST,
+      },
+      requestInfo: {
+        origin: request.headers.origin,
+        referer: request.headers.referer,
+        userAgent: request.headers["user-agent"],
+      },
+      corsConfig: allowedOrigins,
+    }
+  })
+
+  // =========================
+  // ROUTES
+  // =========================
   await fastify.register(authRoutes)
   await fastify.register(uploadsRoutes)
   await fastify.register(companiesRoutes)

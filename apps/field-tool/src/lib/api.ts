@@ -1,5 +1,15 @@
 const API_BASE_URL = import.meta.env.VITE_API_URL
 
+// CRITICAL: Log the environment variable immediately
+console.log("[ApiClient] VITE_API_URL at runtime:", API_BASE_URL)
+console.log("[ApiClient] All env vars:", import.meta.env)
+
+// Validate that API URL is set
+if (!API_BASE_URL || API_BASE_URL === "undefined") {
+  console.error("[ApiClient] ERROR: VITE_API_URL is not defined! API calls will fail.")
+  console.error("[ApiClient] Make sure VITE_API_URL is set in .env or environment variables")
+}
+
 interface FetchOptions extends RequestInit {
   headers?: Record<string, string>
   timeout?: number
@@ -52,6 +62,13 @@ export class ApiClient {
 
       return response.json()
     } catch (err: any) {
+      console.error("[ApiClient] Request error:", {
+        error: err.message,
+        code: err.code,
+        url: url,
+        baseURL: API_BASE_URL,
+      })
+
       if (err.name === "AbortError") {
         throw new Error(
           "Request timeout. Server is not responding. Please check your connection."
@@ -59,7 +76,7 @@ export class ApiClient {
       }
       if (err instanceof TypeError && err.message.includes("Failed to fetch")) {
         throw new Error(
-          "Network error. Please check your connection and ensure the API server is accessible."
+          `Network error. API URL: ${API_BASE_URL}. Please check your connection and ensure the API server is accessible.`
         )
       }
       throw err
