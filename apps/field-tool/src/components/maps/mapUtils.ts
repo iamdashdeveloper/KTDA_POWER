@@ -60,7 +60,7 @@ export function generateInstruction(
       action = `Continue onto ${street}`
       break
     case "direct":
-      action = maneuver.instruction || `Proceed off-road to your destination`
+      action = (maneuver as any).instruction || `Proceed off-road to your destination`
       break
     default:
       action = `Proceed on ${street}`

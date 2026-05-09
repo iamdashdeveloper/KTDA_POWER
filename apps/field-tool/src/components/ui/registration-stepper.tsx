@@ -93,15 +93,16 @@ export const RegistrationStepper = ({
                               <Circle
                                 className={cn(
                                   "h-8 w-8 text-muted-foreground",
-                                  isActive && "text-primary"
+                                  isActive ? "text-primary" : ""
                                 )}
                               />
                               <span
                                 className={cn(
                                   "absolute text-sm font-semibold text-muted-foreground",
                                   "inset-0 flex items-center justify-center",
-                                  isActive &&
-                                    "m-1 h-6 w-6 rounded-full bg-primary text-primary-foreground"
+                                  isActive
+                                    ? "m-1 h-6 w-6 rounded-full bg-primary text-primary-foreground"
+                                    : ""
                                 )}
                               >
                                 {stepNumber}
@@ -122,8 +123,8 @@ export const RegistrationStepper = ({
                           <h4
                             className={cn(
                               "font-medium",
-                              isActive && "text-foreground",
-                              isCompleted && "text-muted-foreground"
+                              isActive ? "text-foreground" : "",
+                              isCompleted ? "text-muted-foreground" : ""
                             )}
                           >
                             {step.title}
@@ -135,7 +136,7 @@ export const RegistrationStepper = ({
                         <ChevronDown
                           className={cn(
                             "h-4 w-4 text-muted-foreground transition-transform",
-                            isActive && "rotate-180"
+                            isActive ? "rotate-180" : ""
                           )}
                         />
                       </div>

@@ -12,10 +12,10 @@ import { useProjectStore } from "@/store/useProjectStore"
 // Validation schema for map-triggered issue form
 const MapIssueFormSchema = z.object({
   title: z.string().min(1, "Issue title is required").max(255),
-  description: z.string().max(2000).optional(),
-  priority: z.number().int().min(0).max(3).default(0),
-  notes: z.string().max(1000).optional(),
-  images: z.array(z.string()).default([]),
+  description: z.string().max(2000).nullish(),
+  priority: z.number().int().min(0).max(3),
+  notes: z.string().max(1000).nullish(),
+  images: z.array(z.string()),
 })
 
 type MapIssueFormData = z.infer<typeof MapIssueFormSchema>
@@ -48,7 +48,7 @@ export function MapTriggeredIssueForm({
     handleSubmit,
     formState: { errors },
   } = useForm<MapIssueFormData>({
-    resolver: zodResolver(MapIssueFormSchema),
+    resolver: zodResolver(MapIssueFormSchema) as any,
     defaultValues: {
       title: "",
       description: "",
@@ -250,7 +250,7 @@ export function MapTriggeredIssueForm({
         <div className="p-6">
           <h2 className="mb-6 text-2xl font-bold">Report Issue on Field</h2>
 
-          <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
+          <form onSubmit={handleSubmit(onSubmit as any)} className="space-y-6">
             {/* Basic Information */}
             <div>
               <label className="mb-2 block text-sm font-medium">

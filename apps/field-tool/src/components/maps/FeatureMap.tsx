@@ -69,7 +69,6 @@ export default function FeatureMap() {
   const [isIssueFormOpen, setIsIssueFormOpen] = useState(false)
   const [isRoutingModalOpen, setIsRoutingModalOpen] = useState(false)
   const [selectedIssue, setSelectedIssue] = useState<Issue | null>(null)
-  const [dataReloadKey, setDataReloadKey] = useState(0)
   const handleColorChange = (groupId: string, color: string) => {
     setStoredLayerColor(groupId, color)
     featureSourceRef.current.changed()
@@ -788,7 +787,6 @@ export default function FeatureMap() {
       {isIssueFormOpen && (
         <MapTriggeredIssueForm
           onClose={() => setIsIssueFormOpen(false)}
-          onSuccess={() => setDataReloadKey((v) => v + 1)}
         />
       )}
 
