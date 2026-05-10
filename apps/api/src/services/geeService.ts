@@ -110,7 +110,7 @@ export async function initializeGEE(): Promise<void> {
 keyFileContents.private_key = keyFileContents.private_key
   .replace(/\\n/g, "\n")
   const serviceAccountEmail = keyFileContents.client_email
-
+console.log(keyFileContents.private_key.slice(0, 50))
   if (!serviceAccountEmail) {
     throw new Error(
       "Invalid service account key file: missing 'client_email' field."
