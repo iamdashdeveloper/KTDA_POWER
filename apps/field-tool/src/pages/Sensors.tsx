@@ -222,23 +222,25 @@ export default function Sensors() {
 
           {/* Content */}
           <div className="flex-1 p-4 overflow-auto space-y-6">
-            {/* LARGE ACTION BUTTON */}
-            <div className="bg-primary/5 border-2 border-primary/20 p-6 flex flex-col items-center justify-center gap-4 text-center">
-              <div className="p-4 bg-primary text-primary-foreground rounded-full shadow-lg">
-                <selectedSensor.icon className="h-8 w-8" />
-              </div>
-              <div className="space-y-1">
-                <h2 className="text-2xl font-black uppercase tracking-tighter">Ready to log?</h2>
-                <p className="text-sm text-muted-foreground font-medium">Capture current {selectedSensor.name.toLowerCase()} metrics with GPS validation</p>
-              </div>
+            
+            <div className="flex flex-row items-center justify-between gap-4">
               <LogReadingDialog 
                 trigger={
-                  <Button size="lg" className="w-full sm:w-auto px-12 h-14 rounded-none font-black text-lg uppercase tracking-widest shadow-xl">
-                    <Plus className="h-6 w-6 mr-2" />
+                  <Button size="sm" className="sm:w-auto px-2 rounded-none font-semibold text-sm">
+                    <Plus className="h-4 w-4 mr-2" />
                     Log Today's Reading
                   </Button>
                 }
               />
+              <Button 
+                variant="outline" 
+                size="sm" 
+                onClick={() => setSelectedSensor(null)}
+                className="sm:w-auto px-2 rounded-none font-semibold text-sm border-2"
+              >
+                <ArrowLeft className="h-4 w-4 mr-2" />
+                Back to Sensors Menu
+              </Button>
             </div>
 
             <div className="border bg-card shadow-sm">
