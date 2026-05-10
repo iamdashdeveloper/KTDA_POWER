@@ -160,28 +160,74 @@ export async function getWorldCoverTileUrl(
     (c) => paletteOverrides?.[c.value] || c.color
   );
 
-  return new Promise((resolve, reject) => {
-    image.getMap(
-      {
-        min: 10,
-        max: 100,
-        palette,
-      },
-      ({ mapid, token, error }: any) => {
-        if (error) {
-          reject(new Error(`[GEE] getMap failed: ${error}`));
-          return;
-        }
+  const visParams = {
+    min: 10,
+    max: 100,
+    palette,
+    opacity: params.opacity ?? 1.0,
+  };
 
-        resolve({
-          tileUrl: `https://earthengine.googleapis.com/v1alpha/${mapid}/tiles/{z}/{x}/{y}`,
-          mapId: mapid,
-          token,
-          attribution: "© ESA WorldCover via Google Earth Engine",
-          legend: ESA_WORLDCOVER_LEGEND,
-        });
+  return new Promise((resolve, reject) => {
+    image.getMap(visParams, ({ mapid, token, error }: any) => {
+      if (error) {
+        reject(new Error(`[GEE] getMap failed: ${error}`));
+        return;
       }
-    );
+
+      resolve({
+        tileUrl: `https://earthengine.googleapis.com/v1alpha/${mapid}/tiles/{z}/{x}/{y}`,
+        mapId: mapid,
+        token,
+        attribution: "© ESA WorldCover via Google Earth Engine",
+        legend: ESA_WORLDCOVER_LEGEND.map(c => ({
+          ...c,
+          color: paletteOverrides?.[c.value] || c.color
+        })),
+      });
+    });
+  });
+}
+
+/**
+ * Generates an XYZ tile URL for the Copernicus Global Land Cover (100 m).
+ */
+export async function getCopernicusTileUrl(
+  year: number = 2019
+): Promise<TileUrlResponse> {
+  await initializeGEE();
+
+  const collection = ee
+    .ImageCollection("COPERNICUS/Landcover/100m/Proba-V-C3/Global")
+    .filter(ee.Filter.calendarRange(year, year, "year"))
+    .first();
+
+  const visParams = {
+    bands: ["discrete_classification"],
+    min: 0,
+    max: 200,
+    opacity: 1.0,
+    palette: [
+      "#282828", "#FFBB22", "#FFFF4C", "#F096FF", "#FA0000",
+      "#B4B4B4", "#F0F0F0", "#0064C8", "#0096A0", "#00CF75",
+      "#006400", "#003C00", "#003C00", "#FFBB22",
+    ],
+  };
+
+  return new Promise<TileUrlResponse>((resolve, reject) => {
+    collection.getMap(visParams, ({ mapid, token, error }: any) => {
+      if (error) {
+        reject(new Error(`[GEE] getMap (Copernicus) failed: ${error}`));
+        return;
+      }
+
+      resolve({
+        tileUrl: `https://earthengine.googleapis.com/v1alpha/${mapid}/tiles/{z}/{x}/{y}`,
+        mapId: mapid,
+        token,
+        attribution: "© Copernicus Global Land Service (100m) via Google Earth Engine",
+        legend: ESA_WORLDCOVER_LEGEND,
+      });
+    });
   });
 }
 
