@@ -25,7 +25,7 @@ export function MapLegend({
   if (!isOpen) return null
 
   return (
-    <div className="absolute bottom-40 left-16 z-20 max-h-[45vh] w-80 overflow-hidden rounded-2xl bg-card/95 p-3 shadow-xl backdrop-blur">
+    <div className="absolute bottom-40 left-[5%] z-20 max-h-[45vh] w-80 overflow-hidden rounded-2xl bg-card/95 p-3 shadow-xl backdrop-blur">
       <div className="mb-2 flex items-center justify-between">
         <div>
           <h3 className="text-sm font-semibold text-card-foreground">

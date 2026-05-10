@@ -1,14 +1,13 @@
 import { Outlet, useNavigate } from "react-router-dom"
 
 import { Dock } from "@/components/ui/dock-two"
-import { Home, Activity, BarChart3, CheckCircle2, Settings } from "lucide-react"
+import { Home, Activity, CheckCircle2, Settings, Plus } from "lucide-react"
 import Navbar from "@/components/ui/navbar"
+import { useUIStore } from "@/store/useUIStore"
 
 export default function RootLayout() {
   const navigate = useNavigate()
-  // const location = useLocation()
-
-  // const isActive = (path: string) => location.pathname === path
+  const { setIsIssueFormOpen } = useUIStore()
 
   const dockItems = [
     {
@@ -22,9 +21,10 @@ export default function RootLayout() {
       icon: Activity,
     },
     {
-      path: "/data",
-      label: "Data",
-      icon: BarChart3,
+      path: "#",
+      label: "Create Issue",
+      icon: Plus,
+      onClick: () => setIsIssueFormOpen(true),
     },
     {
       path: "/tasks",
@@ -37,13 +37,14 @@ export default function RootLayout() {
       icon: Settings,
     },
   ]
+
   return (
     <div className="app fixed inset-0 flex flex-col">
       {/* Navbar */}
       <Navbar />
 
       {/* Main Content */}
-      <div className="">
+      <div className="flex-1 overflow-hidden pb-16">
         <Outlet />
       </div>
 
@@ -52,7 +53,7 @@ export default function RootLayout() {
         items={dockItems.map((item) => ({
           icon: item.icon,
           label: item.label,
-          onClick: () => navigate(item.path),
+          onClick: item.onClick || (() => navigate(item.path)),
         }))}
       />
     </div>

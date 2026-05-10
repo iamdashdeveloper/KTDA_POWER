@@ -17,8 +17,7 @@ import Stroke from "ol/style/Stroke"
 import CircleStyle from "ol/style/Circle"
 import Text from "ol/style/Text"
 import * as turf from "@turf/turf"
-import { Button } from "@workspace/ui/components/button"
-import { Triangle, Plus } from "lucide-react"
+import { useUIStore } from "@/store/useUIStore"
 import { MapTriggeredIssueForm } from "@/components/forms/MapTriggeredIssueForm"
 import { IssueDetailsModal } from "@/components/modals/IssueDetailsModal"
 import { RoutingModal, type DestinationType } from "@/components/modals/RoutingModal"
@@ -65,8 +64,7 @@ export default function FeatureMap() {
   const [isLoading, setIsLoading] = useState(false)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
   const [featureCount, setFeatureCount] = useState(0)
-  const [isLegendOpen, setIsLegendOpen] = useState(false)
-  const [isIssueFormOpen, setIsIssueFormOpen] = useState(false)
+  const { isIssueFormOpen, setIsIssueFormOpen, isLegendOpen, setIsLegendOpen } = useUIStore()
   const [isRoutingModalOpen, setIsRoutingModalOpen] = useState(false)
   const [selectedIssue, setSelectedIssue] = useState<Issue | null>(null)
   const handleColorChange = (groupId: string, color: string) => {
@@ -735,30 +733,7 @@ export default function FeatureMap() {
         onOpenRouting={() => setIsRoutingModalOpen(true)}
       />
 
-      <div className="absolute bottom-32 left-4 z-20">
-        <Button
-          type="button"
-          variant="default"
-          size="icon"
-          onClick={() => setIsLegendOpen((open) => !open)}
-          className="shadow-lg"
-          title="Toggle map legend"
-        >
-          <Triangle className="h-4 w-4" />
-        </Button>
-      </div>
 
-      <div className="absolute right-4 bottom-32 z-20">
-        <Button
-          type="button"
-          size="icon"
-          onClick={() => setIsIssueFormOpen(true)}
-          className="bg-primary text-primary-foreground shadow-lg hover:bg-primary/90"
-          title="Report new issue"
-        >
-          <Plus className="h-5 w-5" />
-        </Button>
-      </div>
 
       <MapLegend
         isOpen={isLegendOpen}

@@ -6,8 +6,10 @@ import {
   LocateFixed,
   Volume2,
   VolumeX,
+  Triangle,
 } from "lucide-react"
 import type { Basemap } from "./types"
+import { useUIStore } from "@/store/useUIStore"
 
 interface MapToolbarProps {
   basemap: Basemap
@@ -28,8 +30,22 @@ export function MapToolbar({
   onToggleVoice,
   onOpenRouting,
 }: MapToolbarProps) {
+  const { isLegendOpen, setIsLegendOpen } = useUIStore()
+
   return (
     <div className="absolute top-20 left-4 z-10 flex max-w-[calc(100%-2rem)] flex-wrap items-center gap-3 rounded-2xl bg-card/90 p-2 shadow-lg backdrop-blur">
+      <Button
+        type="button"
+        variant={isLegendOpen ? "default" : "outline"}
+        size="sm"
+        onClick={() => setIsLegendOpen(!isLegendOpen)}
+        className="gap-2"
+        title="Toggle map legend"
+      >
+        <Triangle className="h-4 w-4" />
+        Legend
+      </Button>
+
       <Button
         type="button"
         variant={basemap === "osm" ? "default" : "outline"}

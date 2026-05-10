@@ -50,11 +50,11 @@ export const RegistrationStepper = ({
     <div className={cn("mx-auto w-screen max-w-md", className)}>
       <div className="rounded-xl border bg-card text-card-foreground shadow-sm">
         <div className="flex flex-col space-y-1.5 p-6">
-          <div className="flex items-center justify-between">
-            <h3 className="text-lg leading-none font-semibold tracking-tight">
+          <div className="flex flex-col gap-2 items-center justify-between">
+            <h3 className="text-sm font-semibold">
               {headerTitle}
             </h3>
-            <span className="rounded-full bg-green-500/10 px-2 py-1 text-xs font-semibold text-green-500">
+            <span className="rounded-full p-1 bg-green-500/10 text-xs font-semibold text-green-500">
               {headerStatus}
             </span>
           </div>

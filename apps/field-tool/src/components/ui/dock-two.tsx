@@ -9,6 +9,7 @@ interface DockProps {
     icon: LucideIcon
     label: string
     onClick?: () => void
+    className?: string
   }[]
 }
 
@@ -24,23 +25,23 @@ const DockIconButton = React.forwardRef<HTMLButtonElement, DockIconButtonProps>(
     return (
       <motion.button
         ref={ref}
-        whileHover={{ scale: 1.1, y: -2 }}
+        whileHover={{ scale: 1.05 }}
         whileTap={{ scale: 0.95 }}
         onClick={onClick}
         className={cn(
-          "group relative p-3",
-          "transition-colors hover:bg-secondary",
+          "group relative flex flex-col items-center justify-center h-12 w-12 rounded-xl transition-all hover:bg-secondary",
           className
         )}
       >
         <Icon className="h-5 w-5 text-foreground" />
+        <span className="mt-1 text-[9px] font-medium opacity-60">{label}</span>
         <span
           className={cn(
-            "absolute -top-8 left-1/2 -translate-x-1/2",
-            "rounded px-2 py-1 text-xs",
-            "bg-popover text-popover-foreground",
+            "absolute -top-10 left-1/2 -translate-x-1/2",
+            "rounded-lg px-2 py-1 text-xs font-medium",
+            "bg-popover text-popover-foreground shadow-md border",
             "opacity-0 group-hover:opacity-100",
-            "pointer-events-none whitespace-nowrap transition-opacity"
+            "pointer-events-none whitespace-nowrap transition-all duration-200"
           )}
         >
           {label}
@@ -57,12 +58,15 @@ const Dock = React.forwardRef<HTMLDivElement, DockProps>(
       <div
         ref={ref}
         className={cn(
-          "fixed right-0 bottom-0 left-0 flex w-full justify-between border-2 bg-card p-4 text-foreground",
+          "fixed bottom-0 left-0 right-0 z-50 flex h-16 items-center justify-between bg-card px-6 pb-2 backdrop-blur-lg border-t shadow-lg",
           className
         )}
       >
         {items.map((item) => (
-          <DockIconButton key={item.label} {...item} />
+          <DockIconButton 
+            key={item.label} 
+            {...item} 
+          />
         ))}
       </div>
     )
