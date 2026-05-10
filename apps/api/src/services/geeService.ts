@@ -99,16 +99,11 @@ let _initialized = false
 export async function initializeGEE(): Promise<void> {
   if (_initialized) return
 
-  const keyFilePath =
-    process.env.GEE_SERVICE_ACCOUNT_KEY_FILE ??
-    path.resolve(process.cwd(), "secrets/agrisense-474813-861d493035d0.json")
+  const keyFilePath = process.env.GEE_SERVICE_ACCOUNT_KEY_FILE
 
-  if (!fs.existsSync(keyFilePath)) {
-    throw new Error(
-      `GEE service account key file not found at: ${keyFilePath}\n` +
-        `Set the GEE_SERVICE_ACCOUNT_KEY_FILE environment variable to the correct path.`
-    )
-  }
+  if (!keyFilePath) {
+  throw new Error("[GEE] Missing GEE_SERVICE_ACCOUNT_KEY_FILE env var")
+}
 
   const keyFileContents = JSON.parse(fs.readFileSync(keyFilePath, "utf-8"))
   const serviceAccountEmail = keyFileContents.client_email
