@@ -97,7 +97,7 @@ export async function initializeGEE(): Promise<void> {
 
   const keyFilePath =
     process.env.GEE_SERVICE_ACCOUNT_KEY_FILE ??
-    path.resolve(__dirname, "../../secrets/agrisense-474813-861d493035d0.json")
+    path.resolve(process.cwd(), "secrets/agrisense-474813-861d493035d0.json")
 
   if (!fs.existsSync(keyFilePath)) {
     throw new Error(
