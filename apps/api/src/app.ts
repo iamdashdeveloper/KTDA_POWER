@@ -44,44 +44,11 @@ export async function createApp() {
     bodyLimit: 52428800,
   })
 
-  // =========================
-  // CORS (SINGLE SOURCE OF TRUTH)
-  // =========================
-  const allowedOrigins = env.CORS_ORIGIN.split(",")
-    .map((o) => o.trim())
-    .filter(Boolean)
-
-  // Helper to check if origin is allowed (handles wildcards)
-  const isOriginAllowed = (origin: string): boolean => {
-    return allowedOrigins.some((allowed) => {
-      if (allowed === "*") return true
-      // Handle wildcards like https://*.onrender.com
-      if (allowed.includes("*")) {
-        const pattern = allowed.replace(/\./g, "\\.").replace(/\*/g, "[^/]+")
-        const regex = new RegExp(`^${pattern}$`)
-        return regex.test(origin)
-      }
-      return origin === allowed
-    })
-  }
-
   await fastify.register(cors, {
-    origin: (origin, callback) => {
-      console.log(`[CORS] Request from: ${origin || "same-origin"}`)
-
-      // allow server-to-server / mobile apps / curl
-      if (!origin) return callback(null, true)
-
-      if (isOriginAllowed(origin)) {
-        return callback(null, true)
-      }
-
-      console.warn(`[CORS] Blocked origin: ${origin}`)
-      return callback(new Error("Not allowed by CORS"), false)
-    },
+    origin: true,
     methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-    credentials: false, // Don't require credentials for CORS
-    allowedHeaders: ["Content-Type", "Authorization"],
+    credentials: true,
+    allowedHeaders: ["Content-Type", "Authorization", "Accept", "X-Requested-With"],
   })
 
   // =========================
@@ -161,7 +128,7 @@ export async function createApp() {
         referer: request.headers.referer,
         userAgent: request.headers["user-agent"],
       },
-      corsConfig: allowedOrigins,
+      corsConfig: "All origins enabled",
     }
   })
 
