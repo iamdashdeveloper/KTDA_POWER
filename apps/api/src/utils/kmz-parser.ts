@@ -10,8 +10,9 @@ export async function parseKMZ(fileBuffer: Buffer): Promise<any[]> {
 
     // Find KML file in the ZIP
     for (const [filename, file] of Object.entries(loaded.files)) {
+      const f = file as any
       if (filename.endsWith(".kml")) {
-        kmlContent = await file.async("string")
+        kmlContent = await f.async("string")
         break
       }
     }

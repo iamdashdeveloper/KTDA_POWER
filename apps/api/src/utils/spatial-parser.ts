@@ -48,9 +48,9 @@ export async function parseSpatialFile(
 async function extractKmlFromKmz(buffer: Buffer): Promise<string> {
   const zip = new JSZip()
   await zip.loadAsync(buffer)
-  const kmlFile = Object.values(zip.files).find((f) =>
+  const kmlFile = Object.values(zip.files).find((f: any) =>
     f.name.toLowerCase().endsWith(".kml")
-  )
+  ) as any
   if (!kmlFile) throw new Error("No KML found in KMZ")
   return kmlFile.async("text")
 }
