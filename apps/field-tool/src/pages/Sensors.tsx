@@ -224,14 +224,6 @@ export default function Sensors() {
           <div className="flex-1 p-4 overflow-auto space-y-6">
             
             <div className="flex flex-row items-center justify-between gap-4">
-              <LogReadingDialog 
-                trigger={
-                  <Button size="sm" className="sm:w-auto px-2 rounded-none font-semibold text-sm">
-                    <Plus className="h-4 w-4 mr-2" />
-                    Log Today's Reading
-                  </Button>
-                }
-              />
               <Button 
                 variant="outline" 
                 size="sm" 
@@ -239,8 +231,17 @@ export default function Sensors() {
                 className="sm:w-auto px-2 rounded-none font-semibold text-sm border-2"
               >
                 <ArrowLeft className="h-4 w-4 mr-2" />
-                Back to Sensors Menu
+                Sensors Menu
               </Button>
+              <LogReadingDialog 
+                trigger={
+                  <Button size="sm" className="sm:w-auto px-2 rounded-none font-semibold text-sm">
+                    <Plus className="h-4 w-4 mr-2" />
+                    Log Reading
+                  </Button>
+                }
+              />
+              
             </div>
 
             <div className="border bg-card shadow-sm">
@@ -332,9 +333,8 @@ export default function Sensors() {
 
   return (
     <Page>
-      <div className="p-6 bg-background min-h-full">
-        <header className="mb-8">
-          <h1 className="text-4xl font-black tracking-tighter uppercase">Sensors</h1>
+      <div className="p-6 mt-16 bg-background min-h-full">
+        <header className="mt-2">
           <div className="h-1 w-12 bg-primary mt-2" />
           <p className="text-muted-foreground mt-4 font-medium text-sm">Industrial monitoring & data collection terminal</p>
         </header>
