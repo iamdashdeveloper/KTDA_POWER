@@ -1,63 +1,48 @@
 /**
  * Google Earth Engine (GEE) Service
- *
- * Authenticates via a GCP Service Account and exposes helpers
- * for the ESA WorldCover / Copernicus Global Land Cover datasets.
- *
- * Dataset used:
- *   ESA WorldCover 10m v100  →  "ESA/WorldCover/v100"
- *   ESA WorldCover 10m v200  →  "ESA/WorldCover/v200"   (latest, 2021)
- *   Copernicus Global Land Cover (100m) →  "COPERNICUS/Landcover/100m/Proba-V-C3/Global"
  */
 
-import ee from "@google/earthengine"
-import fs from "fs"
-import path from "path"
-import { fileURLToPath } from "url"
+import ee from "@google/earthengine";
+import fs from "fs";
+import path from "path";
+import { fileURLToPath } from "url";
 
-const __filename = fileURLToPath(import.meta.url)
-const __dirname = path.dirname(__filename)
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Types
 // ─────────────────────────────────────────────────────────────────────────────
 
 export interface LandCoverTileParams {
-  /** Bounding box [west, south, east, north] in WGS-84 decimal degrees */
-  bbox?: [number, number, number, number]
-  /** Year of the WorldCover mosaic (2020, 2021, etc) */
-  year?: number
-  /** Visualization opacity 0-1 */
-  opacity?: number
-  /** List of class values that should be visible. If empty, all are shown. */
-  visibleClasses?: number[]
-  /** Map of class value to hex color code for overrides */
-  paletteOverrides?: Record<number, string>
+  bbox?: [number, number, number, number];
+  year?: number;
+  opacity?: number;
+  visibleClasses?: number[];
+  paletteOverrides?: Record<number, string>;
 }
 
 export interface LandCoverStatsParams {
-  /** GeoJSON geometry (Polygon or MultiPolygon) */
-  geometry: GeoJSON.Polygon | GeoJSON.MultiPolygon
-  /** Year of the WorldCover mosaic (2020, 2021, etc) */
-  year?: number
+  geometry: GeoJSON.Polygon | GeoJSON.MultiPolygon;
+  year?: number;
 }
 
 export interface TileUrlResponse {
-  tileUrl: string
-  mapId: string
-  token: string
-  attribution: string
-  legend: LandCoverClass[]
+  tileUrl: string;
+  mapId: string;
+  token: string;
+  attribution: string;
+  legend: LandCoverClass[];
 }
 
 export interface LandCoverClass {
-  value: number
-  label: string
-  color: string
+  value: number;
+  label: string;
+  color: string;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// ESA WorldCover legend (v100 / v200)
+// Legend
 // ─────────────────────────────────────────────────────────────────────────────
 
 export const ESA_WORLDCOVER_LEGEND: LandCoverClass[] = [
@@ -72,265 +57,178 @@ export const ESA_WORLDCOVER_LEGEND: LandCoverClass[] = [
   { value: 90, label: "Herbaceous wetland", color: "#0096A0" },
   { value: 95, label: "Mangroves", color: "#00CF75" },
   { value: 100, label: "Moss and lichen", color: "#FAE6A0" },
-]
+];
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Visualization parameters that mirror the GEE catalogue defaults
+// Auth state
 // ─────────────────────────────────────────────────────────────────────────────
 
-const VIS_PARAMS = {
-  bands: ["Map"],
-  min: 0,
-  max: 100,
-  palette: ESA_WORLDCOVER_LEGEND.map((c) => c.color),
-}
+let initialized = false;
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Authentication
+// AUTH FIX (CRITICAL SECTION)
 // ─────────────────────────────────────────────────────────────────────────────
 
-let _initialized = false
-
-/**
- * Authenticate with GEE using a service-account private key JSON file.
- * The path is resolved from GEE_SERVICE_ACCOUNT_KEY_FILE env var or a
- * sensible default (<api-root>/secrets/gee-service-account.json).
- */
 export async function initializeGEE(): Promise<void> {
-  if (_initialized) return
+  if (initialized) return;
 
-  const keyFilePath = process.env.GEE_SERVICE_ACCOUNT_KEY_FILE
+  const keyFilePath = process.env.GEE_SERVICE_ACCOUNT_KEY_FILE;
 
   if (!keyFilePath) {
-  throw new Error("[GEE] Missing GEE_SERVICE_ACCOUNT_KEY_FILE env var")
-}
-
-  const keyFileContents = JSON.parse(fs.readFileSync(keyFilePath, "utf-8"))
-  // 🔥 FIX: normalize private key formatting
-keyFileContents.private_key = keyFileContents.private_key
-  .replace(/\\n/g, "\n")
-  const serviceAccountEmail = keyFileContents.client_email
-console.log(keyFileContents.private_key.slice(0, 50))
-  if (!serviceAccountEmail) {
-    throw new Error(
-      "Invalid service account key file: missing 'client_email' field."
-    )
+    throw new Error("[GEE] Missing GEE_SERVICE_ACCOUNT_KEY_FILE env var");
   }
+
+  if (!fs.existsSync(keyFilePath)) {
+    throw new Error(`[GEE] Key file not found at: ${keyFilePath}`);
+  }
+
+  const raw = fs.readFileSync(keyFilePath, "utf-8");
+
+  const key = JSON.parse(raw);
+
+  if (!key.private_key || !key.client_email) {
+    throw new Error("[GEE] Invalid service account file");
+  }
+
+  // 🔥 CRITICAL FIX: normalize PEM formatting for JWT signing
+  key.private_key = key.private_key
+    .replace(/\\n/g, "\n")   // escaped → real newline
+    .replace(/\r\n/g, "\n")  // Windows line endings
+    .replace(/\r/g, "\n")    // legacy Mac
+    .trim();
+
+  console.log("[GEE] Using service account:", key.client_email);
 
   await new Promise<void>((resolve, reject) => {
     ee.data.authenticateViaPrivateKey(
-      keyFileContents,
+      key,
       () => {
         ee.initialize(
           null,
           null,
           () => {
-            _initialized = true
-            console.log(
-              `[GEE] Authenticated as: ${serviceAccountEmail}`
-            )
-            resolve()
+            initialized = true;
+            console.log("[GEE] Initialized successfully");
+            resolve();
           },
-          (err: string) => reject(new Error(`[GEE] Initialize failed: ${err}`))
-        )
+          (err: string) =>
+            reject(new Error(`[GEE] Init failed: ${err}`))
+        );
       },
       (err: string) =>
-        reject(new Error(`[GEE] Authentication failed: ${err}`))
-    )
-  })
+        reject(new Error(`[GEE] Auth failed: ${err}`))
+    );
+  });
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Core helpers
+// Dataset helper
 // ─────────────────────────────────────────────────────────────────────────────
 
-/**
- * Return the ESA WorldCover image for the requested year.
- * v100 → 2020 mosaic, v200 → 2021 mosaic.
- */
 function getWorldCoverImage(year: number = 2021): any {
-  // ESA WorldCover has v100 (2020) and v200 (2021)
-  // For 2022/2023, we fallback to v200 until new data is released
-  const collection = year <= 2020 ? "ESA/WorldCover/v100" : "ESA/WorldCover/v200"
-  return ee.ImageCollection(collection).first()
+  const collection =
+    year <= 2020
+      ? "ESA/WorldCover/v100"
+      : "ESA/WorldCover/v200";
+
+  return ee.ImageCollection(collection).first();
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Public API
+// TILE API
 // ─────────────────────────────────────────────────────────────────────────────
 
-/**
- * Generates an XYZ tile URL for the ESA WorldCover layer.
- * Returns a tile template URL + legend that can be dropped straight
- * into Leaflet / MapLibre / OpenLayers as a TileLayer.
- */
 export async function getWorldCoverTileUrl(
   params: LandCoverTileParams = {}
 ): Promise<TileUrlResponse> {
-  await initializeGEE()
+  await initializeGEE();
 
-  const { year = 2021, visibleClasses, paletteOverrides } = params
+  const { year = 2021, visibleClasses, paletteOverrides } = params;
 
-  let image = getWorldCoverImage(year).select("Map")
+  let image = getWorldCoverImage(year).select("Map");
 
-  // 1. Handle Class Visibility (Masking)
-  // If visibleClasses is provided, we mask out everything else
-  if (visibleClasses && visibleClasses.length > 0) {
-    const mask = image.eq(visibleClasses[0])
-    let combinedMask = mask
+  // masking
+  if (visibleClasses?.length) {
+    let mask = image.eq(visibleClasses[0]);
     for (let i = 1; i < visibleClasses.length; i++) {
-      combinedMask = combinedMask.or(image.eq(visibleClasses[i]))
+      mask = mask.or(image.eq(visibleClasses[i]));
     }
-    image = image.updateMask(combinedMask)
+    image = image.updateMask(mask);
   }
 
-  // 2. Handle Palette Overrides
-  // We construct the final palette by taking the default and applying overrides
-  const finalPalette = ESA_WORLDCOVER_LEGEND.map((c) => {
-    return paletteOverrides?.[c.value] || c.color
-  })
-
-  const visParams = {
-    min: 10,
-    max: 100,
-    palette: finalPalette,
-    opacity: params.opacity ?? 1.0, // Controls 'Visualization Capacity' (0.0 to 1.0)
-  }
-
-  return new Promise<TileUrlResponse>((resolve, reject) => {
-    image.getMap(visParams, ({ mapid, token, error }: any) => {
-      if (error) {
-        reject(new Error(`[GEE] getMap failed: ${error}`))
-        return
-      }
-
-      // Build the standard EE tile URL template
-      const tileUrl = `https://earthengine.googleapis.com/v1alpha/${mapid}/tiles/{z}/{x}/{y}`
-
-      resolve({
-        tileUrl,
-        mapId: mapid,
-        token,
-        attribution:
-          "© ESA WorldCover 10m via Google Earth Engine",
-        legend: ESA_WORLDCOVER_LEGEND.map(c => ({
-          ...c,
-          color: paletteOverrides?.[c.value] || c.color
-        })),
-      })
-    })
-  })
-}
-
-/**
- * Computes per-class land-cover area statistics (km²) for an arbitrary
- * polygon / multipolygon passed in as GeoJSON.
- */
-export async function getWorldCoverStats(
-  params: LandCoverStatsParams
-): Promise<{ stats: Record<string, number>; legend: LandCoverClass[] }> {
-  await initializeGEE()
-
-  const { geometry, year = 2021 } = params
-
-  const image = getWorldCoverImage(year)
-
-  // Convert the incoming GeoJSON geometry to an ee.Geometry
-  const eeGeometry = ee.Geometry(geometry)
+  const palette = ESA_WORLDCOVER_LEGEND.map(
+    (c) => paletteOverrides?.[c.value] || c.color
+  );
 
   return new Promise((resolve, reject) => {
-    // Compute the frequency histogram (pixel count per class value)
+    image.getMap(
+      {
+        min: 10,
+        max: 100,
+        palette,
+      },
+      ({ mapid, token, error }: any) => {
+        if (error) {
+          reject(new Error(`[GEE] getMap failed: ${error}`));
+          return;
+        }
+
+        resolve({
+          tileUrl: `https://earthengine.googleapis.com/v1alpha/${mapid}/tiles/{z}/{x}/{y}`,
+          mapId: mapid,
+          token,
+          attribution: "© ESA WorldCover via Google Earth Engine",
+          legend: ESA_WORLDCOVER_LEGEND,
+        });
+      }
+    );
+  });
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// STATS API
+// ─────────────────────────────────────────────────────────────────────────────
+
+export async function getWorldCoverStats(params: LandCoverStatsParams) {
+  await initializeGEE();
+
+  const { geometry, year = 2021 } = params;
+
+  const image = getWorldCoverImage(year);
+  const eeGeometry = ee.Geometry(geometry);
+
+  return new Promise((resolve, reject) => {
     image
       .select("Map")
       .reduceRegion({
         reducer: ee.Reducer.frequencyHistogram(),
         geometry: eeGeometry,
-        scale: 10, // WorldCover native resolution
+        scale: 10,
         maxPixels: 1e10,
-        bestEffort: true,
       })
       .evaluate((result: any, err: string) => {
         if (err) {
-          reject(new Error(`[GEE] reduceRegion failed: ${err}`))
-          return
+          reject(new Error(err));
+          return;
         }
 
-        const histogram: Record<string, number> = result?.Map ?? {}
+        const histogram = result?.Map ?? {};
 
-        // Convert pixel counts → km²  (10 m pixel → 100 m² → 0.0001 km²)
-        const stats: Record<string, number> = {}
-        for (const [rawKey, count] of Object.entries(histogram)) {
-          const classValue = parseInt(rawKey, 10)
-          const classInfo = ESA_WORLDCOVER_LEGEND.find(
-            (c) => c.value === classValue
-          )
-          const label = classInfo ? classInfo.label : `Class ${classValue}`
-          stats[label] = Math.round((count as number) * 100) / 1e6 // m² → km²
+        const stats: Record<string, number> = {};
+
+        for (const [key, value] of Object.entries(histogram)) {
+          const classValue = Number(key);
+          const label =
+            ESA_WORLDCOVER_LEGEND.find((c) => c.value === classValue)
+              ?.label || `Class ${classValue}`;
+
+          stats[label] = (value as number) * 0.0001; // m² → km²
         }
 
-        resolve({ stats, legend: ESA_WORLDCOVER_LEGEND })
-      })
-  })
-}
-
-/**
- * Generates an XYZ tile URL for the Copernicus Global Land Cover (100 m).
- * This is an alternative dataset – useful when WorldCover is not granular
- * enough or for multi-year time-series.
- *
- * @param year  Any year available in the collection (2015-2019)
- * @param band  Band to visualize (default: "discrete_classification")
- */
-export async function getCopernicusTileUrl(
-  year: number = 2019
-): Promise<TileUrlResponse> {
-  await initializeGEE()
-
-  const collection = ee
-    .ImageCollection("COPERNICUS/Landcover/100m/Proba-V-C3/Global")
-    .filter(ee.Filter.calendarRange(year, year, "year"))
-    .first()
-
-  const visParams = {
-    bands: ["discrete_classification"],
-    min: 0,
-    max: 200,
-    opacity: 1.0, // Hardcoded for now, but can be made dynamic
-    palette: [
-      "#282828", // No input data available
-      "#FFBB22", // Shrubs
-      "#FFFF4C", // Herbaceous vegetation
-      "#F096FF", // Cultivated & managed vegetation / agriculture
-      "#FA0000", // Urban
-      "#B4B4B4", // Bare / sparse vegetation
-      "#F0F0F0", // Snow and ice
-      "#0064C8", // Permanent water bodies
-      "#0096A0", // Herbaceous wetland
-      "#00CF75", // Moss and lichen
-      "#006400", // Closed forest / evergreen needle leaf
-      "#003C00", // Closed forest / deciduous broad leaf
-      "#003C00",
-      "#FFBB22",
-    ],
-  }
-
-  return new Promise<TileUrlResponse>((resolve, reject) => {
-    collection.getMap(visParams, ({ mapid, token, error }: any) => {
-      if (error) {
-        reject(new Error(`[GEE] getMap (Copernicus) failed: ${error}`))
-        return
-      }
-
-      const tileUrl = `https://earthengine.googleapis.com/v1alpha/${mapid}/tiles/{z}/{x}/{y}`
-
-      resolve({
-        tileUrl,
-        mapId: mapid,
-        token,
-        attribution:
-          "© Copernicus Global Land Service (100m) via Google Earth Engine",
-        legend: ESA_WORLDCOVER_LEGEND, // approximate – full Copernicus legend is larger
-      })
-    })
-  })
+        resolve({
+          stats,
+          legend: ESA_WORLDCOVER_LEGEND,
+        });
+      });
+  });
 }
