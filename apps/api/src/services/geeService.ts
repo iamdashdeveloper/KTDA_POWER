@@ -25,17 +25,21 @@ const __dirname = path.dirname(__filename)
 export interface LandCoverTileParams {
   /** Bounding box [west, south, east, north] in WGS-84 decimal degrees */
   bbox?: [number, number, number, number]
-  /** Year of the WorldCover mosaic (2020 or 2021) */
-  year?: 2020 | 2021
+  /** Year of the WorldCover mosaic (2020, 2021, etc) */
+  year?: number
   /** Visualization opacity 0-1 */
   opacity?: number
+  /** List of class values that should be visible. If empty, all are shown. */
+  visibleClasses?: number[]
+  /** Map of class value to hex color code for overrides */
+  paletteOverrides?: Record<number, string>
 }
 
 export interface LandCoverStatsParams {
   /** GeoJSON geometry (Polygon or MultiPolygon) */
   geometry: GeoJSON.Polygon | GeoJSON.MultiPolygon
-  /** Year of the WorldCover mosaic (2020 or 2021) */
-  year?: 2020 | 2021
+  /** Year of the WorldCover mosaic (2020, 2021, etc) */
+  year?: number
 }
 
 export interface TileUrlResponse {
@@ -146,9 +150,10 @@ export async function initializeGEE(): Promise<void> {
  * Return the ESA WorldCover image for the requested year.
  * v100 → 2020 mosaic, v200 → 2021 mosaic.
  */
-function getWorldCoverImage(year: 2020 | 2021 = 2021): any {
-  const collection = year === 2021 ? "ESA/WorldCover/v200" : "ESA/WorldCover/v100"
-  // Both collections have a single image; take the first/only element.
+function getWorldCoverImage(year: number = 2021): any {
+  // ESA WorldCover has v100 (2020) and v200 (2021)
+  // For 2022/2023, we fallback to v200 until new data is released
+  const collection = year <= 2020 ? "ESA/WorldCover/v100" : "ESA/WorldCover/v200"
   return ee.ImageCollection(collection).first()
 }
 
@@ -166,12 +171,36 @@ export async function getWorldCoverTileUrl(
 ): Promise<TileUrlResponse> {
   await initializeGEE()
 
-  const { year = 2021 } = params
+  const { year = 2021, visibleClasses, paletteOverrides } = params
 
-  const image = getWorldCoverImage(year)
+  let image = getWorldCoverImage(year).select("Map")
+
+  // 1. Handle Class Visibility (Masking)
+  // If visibleClasses is provided, we mask out everything else
+  if (visibleClasses && visibleClasses.length > 0) {
+    const mask = image.eq(visibleClasses[0])
+    let combinedMask = mask
+    for (let i = 1; i < visibleClasses.length; i++) {
+      combinedMask = combinedMask.or(image.eq(visibleClasses[i]))
+    }
+    image = image.updateMask(combinedMask)
+  }
+
+  // 2. Handle Palette Overrides
+  // We construct the final palette by taking the default and applying overrides
+  const finalPalette = ESA_WORLDCOVER_LEGEND.map((c) => {
+    return paletteOverrides?.[c.value] || c.color
+  })
+
+  const visParams = {
+    min: 10,
+    max: 100,
+    palette: finalPalette,
+    opacity: params.opacity ?? 1.0, // Controls 'Visualization Capacity' (0.0 to 1.0)
+  }
 
   return new Promise<TileUrlResponse>((resolve, reject) => {
-    image.getMap(VIS_PARAMS, ({ mapid, token, error }: any) => {
+    image.getMap(visParams, ({ mapid, token, error }: any) => {
       if (error) {
         reject(new Error(`[GEE] getMap failed: ${error}`))
         return
@@ -185,8 +214,11 @@ export async function getWorldCoverTileUrl(
         mapId: mapid,
         token,
         attribution:
-          "© ESA WorldCover 10m (ESA / vito / Brockmann Consult / CS / GAMMA Remote Sensing / IIASA / WUR) via Google Earth Engine",
-        legend: ESA_WORLDCOVER_LEGEND,
+          "© ESA WorldCover 10m via Google Earth Engine",
+        legend: ESA_WORLDCOVER_LEGEND.map(c => ({
+          ...c,
+          color: paletteOverrides?.[c.value] || c.color
+        })),
       })
     })
   })
@@ -265,6 +297,7 @@ export async function getCopernicusTileUrl(
     bands: ["discrete_classification"],
     min: 0,
     max: 200,
+    opacity: 1.0, // Hardcoded for now, but can be made dynamic
     palette: [
       "#282828", // No input data available
       "#FFBB22", // Shrubs

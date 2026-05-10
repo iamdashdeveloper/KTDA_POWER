@@ -61,6 +61,12 @@ interface MapStore {
   // Land Cover
   landCoverTileUrl: string | null
   setLandCoverTileUrl: (url: string | null) => void
+  landCoverConfig: {
+    year: number
+    visibleClasses: number[]
+    paletteOverrides: Record<number, string>
+  }
+  setLandCoverConfig: (config: Partial<MapStore["landCoverConfig"]>) => void
 }
 
 export const useMapStore = create<MapStore>((set) => ({
@@ -160,4 +166,13 @@ export const useMapStore = create<MapStore>((set) => ({
   setWeatherPanelOpen: (open) => set({ weatherPanelOpen: open }),
   landCoverTileUrl: null,
   setLandCoverTileUrl: (url) => set({ landCoverTileUrl: url }),
+  landCoverConfig: {
+    year: 2021,
+    visibleClasses: [], // empty means all visible
+    paletteOverrides: {},
+  },
+  setLandCoverConfig: (config) =>
+    set((state) => ({
+      landCoverConfig: { ...state.landCoverConfig, ...config },
+    })),
 }))

@@ -26,6 +26,8 @@ import { RibbonSeparator } from "../RibbonSeparator"
 import { CreateHydroModelModal } from "../../../modals/CreateHydroModelModal"
 import { LoadHydroModelModal } from "../../../modals/LoadHydroModelModal"
 import { ApiClient } from "@/lib/api"
+import { useLayout } from "@/context/LayoutContext"
+import { LandCoverLegend } from "../../panels/LandCoverLegend"
 
 interface AnalysisToolbarProps {
   onToolClick: (toolId: string) => void
@@ -35,6 +37,7 @@ export const AnalysisToolbar: React.FC<AnalysisToolbarProps> = ({
   onToolClick,
 }) => {
   const { viewMode, setViewMode, executeTerrainCommand, setLandCoverTileUrl, setLayerVisibility } = useMapStore()
+  const { openPanel } = useLayout()
   const { addTab } = useHydroModelStore()
   const [isCreateHydroModelOpen, setIsCreateHydroModelOpen] = useState(false)
   const [isLoadHydroModelOpen, setIsLoadHydroModelOpen] = useState(false)
@@ -176,21 +179,23 @@ export const AnalysisToolbar: React.FC<AnalysisToolbarProps> = ({
           <RibbonSmallButton
             icon={isLoadingLandCover ? <Loader2 size={14} className="animate-spin" /> : <FcLandscape size={14} />}
             label="Land Cover"
-            onClick={async () => {
-              console.log("[AnalysisToolbar] Load land cover data")
-              try {
-                setIsLoadingLandCover(true)
-                const res = await ApiClient.get<{ tileUrl: string }>("/gee/worldcover/tiles")
-                if (res.tileUrl) {
-                  setLandCoverTileUrl(res.tileUrl)
-                  setLayerVisibility("landcover", true)
-                }
-              } catch (error) {
-                console.error("Failed to load land cover:", error)
-              } finally {
-                setIsLoadingLandCover(false)
-              }
-            }}
+    onClick={async () => {
+      console.log("[AnalysisToolbar] Load land cover data")
+      try {
+        setIsLoadingLandCover(true)
+        const res = await ApiClient.get<{ tileUrl: string }>("/gee/worldcover/tiles")
+        if (res.tileUrl) {
+          setLandCoverTileUrl(res.tileUrl)
+          setLayerVisibility("landcover", true)
+          // Open the legend panel
+          openPanel("right", <LandCoverLegend />, "Land Cover Legend")
+        }
+      } catch (error) {
+        console.error("Failed to load land cover:", error)
+      } finally {
+        setIsLoadingLandCover(false)
+      }
+    }}
           />
           <RibbonSmallButton
             icon={<Box size={14} />}

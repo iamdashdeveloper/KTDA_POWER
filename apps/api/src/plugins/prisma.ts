@@ -8,6 +8,14 @@ export default fp(async (fastify) => {
   // Create PostgreSQL connection pool
   const pool = new Pool({
     connectionString: process.env.DATABASE_URL,
+    max: 10, // Limit connections in dev
+    idleTimeoutMillis: 30000, // Close idle connections after 30s
+    connectionTimeoutMillis: 5000, // Return error if connection takes > 5s
+  })
+
+  // Handle pool errors to prevent process crashes
+  pool.on("error", (err) => {
+    console.error("[Postgres Pool Error]", err.message)
   })
 
   // Create the Prisma adapter
