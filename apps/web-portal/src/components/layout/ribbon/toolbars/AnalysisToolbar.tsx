@@ -14,7 +14,9 @@ import {
   ChevronRight,
   Box,
   Cloud,
+  Loader2,
 } from "lucide-react"
+import { FcLandscape } from "react-icons/fc";
 import { RibbonGroup } from "../RibbonGroup"
 import { RibbonButton } from "../RibbonButton"
 import { RibbonSmallButton } from "../RibbonSmallButton"
@@ -23,6 +25,7 @@ import { useHydroModelStore } from "@/store/useHydroModelStore"
 import { RibbonSeparator } from "../RibbonSeparator"
 import { CreateHydroModelModal } from "../../../modals/CreateHydroModelModal"
 import { LoadHydroModelModal } from "../../../modals/LoadHydroModelModal"
+import { ApiClient } from "@/lib/api"
 
 interface AnalysisToolbarProps {
   onToolClick: (toolId: string) => void
@@ -31,10 +34,11 @@ interface AnalysisToolbarProps {
 export const AnalysisToolbar: React.FC<AnalysisToolbarProps> = ({
   onToolClick,
 }) => {
-  const { viewMode, setViewMode, executeTerrainCommand } = useMapStore()
+  const { viewMode, setViewMode, executeTerrainCommand, setLandCoverTileUrl, setLayerVisibility } = useMapStore()
   const { addTab } = useHydroModelStore()
   const [isCreateHydroModelOpen, setIsCreateHydroModelOpen] = useState(false)
   const [isLoadHydroModelOpen, setIsLoadHydroModelOpen] = useState(false)
+  const [isLoadingLandCover, setIsLoadingLandCover] = useState(false)
 
   const is3D = viewMode === "TERRAIN_3D"
 
@@ -170,11 +174,22 @@ export const AnalysisToolbar: React.FC<AnalysisToolbarProps> = ({
             onClick={() => onToolClick("open-weather-station")}
           />
           <RibbonSmallButton
-            icon={<Box size={14} />}
-            label="Create Model"
-            onClick={() => {
-              console.log("[AnalysisToolbar] Create Model clicked")
-              setIsCreateHydroModelOpen(true)
+            icon={isLoadingLandCover ? <Loader2 size={14} className="animate-spin" /> : <FcLandscape size={14} />}
+            label="Land Cover"
+            onClick={async () => {
+              console.log("[AnalysisToolbar] Load land cover data")
+              try {
+                setIsLoadingLandCover(true)
+                const res = await ApiClient.get<{ tileUrl: string }>("/gee/worldcover/tiles")
+                if (res.tileUrl) {
+                  setLandCoverTileUrl(res.tileUrl)
+                  setLayerVisibility("landcover", true)
+                }
+              } catch (error) {
+                console.error("Failed to load land cover:", error)
+              } finally {
+                setIsLoadingLandCover(false)
+              }
             }}
           />
           <RibbonSmallButton

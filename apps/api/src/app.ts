@@ -31,6 +31,7 @@ import complaintsRoutes from "./routes/complaints/index.js"
 import feedbackRoutes from "./routes/feedback/index.js"
 import { hydroModelsRoutes } from "./routes/hydro-models/index.js"
 import { ussdService } from "./services/ussdService.js"
+import { geeRoutes } from "./routes/gee/index.js"
 
 import { fileURLToPath } from "url"
 import path from "path"
@@ -156,6 +157,7 @@ export async function createApp() {
   await fastify.register(feedbackRoutes)
   await fastify.register(hydroModelsRoutes)
   await fastify.register(ussdService)
+  await fastify.register(geeRoutes)
 
   return fastify
 }

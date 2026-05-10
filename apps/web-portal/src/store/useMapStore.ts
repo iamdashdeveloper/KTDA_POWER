@@ -58,6 +58,9 @@ interface MapStore {
   // Weather Panel
   weatherPanelOpen: boolean
   setWeatherPanelOpen: (open: boolean) => void
+  // Land Cover
+  landCoverTileUrl: string | null
+  setLandCoverTileUrl: (url: string | null) => void
 }
 
 export const useMapStore = create<MapStore>((set) => ({
@@ -77,6 +80,7 @@ export const useMapStore = create<MapStore>((set) => ({
       type: "feature",
     },
     { id: "project-issues", name: "Map Issues", visible: true, type: "issue" },
+    { id: "landcover", name: "ESA Land Cover", visible: false, type: "base" },
   ],
   toggleLayer: (id) =>
     set((state) => ({
@@ -154,4 +158,6 @@ export const useMapStore = create<MapStore>((set) => ({
     set((state) => ({ refreshTrigger: state.refreshTrigger + 1 })),
   weatherPanelOpen: false,
   setWeatherPanelOpen: (open) => set({ weatherPanelOpen: open }),
+  landCoverTileUrl: null,
+  setLandCoverTileUrl: (url) => set({ landCoverTileUrl: url }),
 }))

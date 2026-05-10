@@ -63,6 +63,7 @@ export const OpenLayersMap: React.FC = () => {
     refreshTrigger,
     viewCenter,
     viewZoom,
+    landCoverTileUrl,
   } = useMapStore()
 
   // Ref for tool to use inside event listeners
@@ -80,6 +81,7 @@ export const OpenLayersMap: React.FC = () => {
     osm: TileLayer<OSM>
     satellite: TileLayer<XYZ>
     reference: TileLayer<XYZ>
+    landcover: TileLayer<XYZ>
     features: VectorLayer<VectorSource>
     issues: VectorLayer<VectorSource>
   } | null>(null)
@@ -123,6 +125,15 @@ export const OpenLayersMap: React.FC = () => {
       }),
       visible: true,
     })
+    const landcover = new TileLayer({
+      source: new XYZ({
+        url: "",
+        crossOrigin: "anonymous",
+      }),
+      visible: false,
+      opacity: 0.7,
+      zIndex: 5,
+    })
     const featuresSource = new VectorSource()
     const features = new VectorLayer({
       source: featuresSource,
@@ -135,11 +146,11 @@ export const OpenLayersMap: React.FC = () => {
       style: issueStyleFunction,
       zIndex: 20,
     })
-    layersRef.current = { osm, satellite, reference, features, issues }
+    layersRef.current = { osm, satellite, reference, landcover, features, issues }
 
     const map = new Map({
       target: mapRef.current,
-      layers: [satellite, osm, reference, features, issues],
+      layers: [satellite, osm, landcover, reference, features, issues],
       interactions: defaultInteractions().extend([]),
       view: new View({
         center: fromLonLat(viewCenter),
@@ -241,6 +252,9 @@ export const OpenLayersMap: React.FC = () => {
         case "reference":
           layersRef.current!.reference.setVisible(layer.visible)
           break
+        case "landcover":
+          layersRef.current!.landcover.setVisible(layer.visible)
+          break
         case "project-features":
           layersRef.current!.features.setVisible(layer.visible)
           break
@@ -250,6 +264,18 @@ export const OpenLayersMap: React.FC = () => {
       }
     })
   }, [layers])
+
+  // Update Landcover URL dynamically
+  React.useEffect(() => {
+    if (layersRef.current?.landcover && landCoverTileUrl) {
+      layersRef.current.landcover.setSource(
+        new XYZ({
+          url: landCoverTileUrl,
+          crossOrigin: "anonymous",
+        })
+      )
+    }
+  }, [landCoverTileUrl])
 
   // Load Scratch Layers (Session/Independent)
   React.useEffect(() => {

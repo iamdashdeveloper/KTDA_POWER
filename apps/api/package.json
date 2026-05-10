@@ -18,6 +18,7 @@
     "@fastify/jwt": "^10.0.0",
     "@fastify/multipart": "^9.0.0",
     "@fastify/static": "^9.1.0",
+    "@google/earthengine": "^1.7.25",
     "@prisma/adapter-pg": "^7.7.0",
     "@prisma/client": "^7.7.0",
     "@tmcw/togeojson": "^7.1.2",
@@ -25,12 +26,15 @@
     "dotenv": "^16.4.5",
     "fastify": "^5.8.4",
     "fastify-plugin": "^5.0.0",
+    "google-auth-library": "^10.6.2",
     "jszip": "^3.10.1",
+    "node-fetch": "^3.3.2",
     "pg": "^8.20.0",
     "zod": "^3.25.76"
   },
   "devDependencies": {
     "@types/geojson": "^7946.0.16",
+    "@types/googlemaps": "^3.43.3",
     "@types/node": "^25.1.0",
     "@types/pg": "^8.20.0",
     "@types/xml2js": "^0.4.14",
