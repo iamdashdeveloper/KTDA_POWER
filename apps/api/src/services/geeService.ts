@@ -106,6 +106,9 @@ export async function initializeGEE(): Promise<void> {
 }
 
   const keyFileContents = JSON.parse(fs.readFileSync(keyFilePath, "utf-8"))
+  // 🔥 FIX: normalize private key formatting
+keyFileContents.private_key = keyFileContents.private_key
+  .replace(/\\n/g, "\n")
   const serviceAccountEmail = keyFileContents.client_email
 
   if (!serviceAccountEmail) {
