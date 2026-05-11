@@ -1,4 +1,4 @@
-const API_BASE_URL = import.meta.env.VITE_API_URL || "https://ktda-power-api.onrender.com"
+const API_BASE_URL = import.meta.env.VITE_API_URL || "https://ktda-power-api.onrender.com" || "http://localhost:3001"
 
 // CRITICAL: Log the environment variable immediately
 console.log("[ApiClient] VITE_API_URL at runtime:", API_BASE_URL)
