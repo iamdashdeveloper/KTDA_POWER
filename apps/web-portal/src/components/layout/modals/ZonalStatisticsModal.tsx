@@ -37,9 +37,10 @@ interface Feature {
 }
 
 interface StatsResult {
-  stats: Record<string, number>
+  stats: any[]
   legend: any[]
-  totalArea: number
+  totalAreaHectares: number
+  geometryAreaHectares: number
 }
 
 export function ZonalStatisticsModal({
@@ -142,14 +143,11 @@ export function ZonalStatisticsModal({
         year: landCoverConfig.year
       })
 
-      // Calculate total area for percentages
-      const stats = response.stats
-      const totalArea = Object.values(stats).reduce((a: any, b: any) => a + b, 0) as number
-
       setResults({
-        stats,
+        stats: response.stats,
         legend: response.legend,
-        totalArea
+        totalAreaHectares: response.totalAnalyzedHectares,
+        geometryAreaHectares: response.geometryAreaM2 / 10000
       })
     } catch (err) {
       console.error("Calculation failed:", err)
@@ -161,13 +159,31 @@ export function ZonalStatisticsModal({
 
   const downloadResults = () => {
     if (!results) return
-    const content = JSON.stringify(results.stats, null, 2)
+    const exportData = {
+      metadata: {
+        projectId,
+        year: landCoverConfig.year,
+        exportedAt: new Date().toISOString(),
+        totalAnalyzedHectares: results.totalAreaHectares.toFixed(4),
+        geometryAreaHectares: results.geometryAreaHectares.toFixed(4)
+      },
+      classes: results.stats.map(s => ({
+        label: s.label,
+        pixelCount: s.pixelCount,
+        areaM2: s.areaM2.toFixed(2),
+        hectares: s.hectares.toFixed(4),
+        km2: s.km2.toFixed(6),
+        percentage: s.percentage.toFixed(2)
+      }))
+    }
+    const content = JSON.stringify(exportData, null, 2)
     const blob = new Blob([content], { type: "application/json" })
     const url = URL.createObjectURL(blob)
     const a = document.createElement("a")
     a.href = url
-    a.download = `zonal_stats_${projectId}_${landCoverConfig.year}.json`
+    a.download = `lulc_stats_${projectId}_${landCoverConfig.year}.json`
     a.click()
+    URL.revokeObjectURL(url)
   }
 
   return (
@@ -260,8 +276,8 @@ export function ZonalStatisticsModal({
                     <div className="space-y-4">
                       <div className="flex items-center justify-between">
                          <div className="text-left">
-                            <p className="text-[10px] font-bold text-muted-foreground uppercase">Total Area Analyzed</p>
-                            <p className="text-lg font-mono font-bold">{(results.totalArea / 10000).toFixed(2)} <span className="text-xs text-muted-foreground">Ha</span></p>
+                            <p className="text-[10px] font-bold text-muted-foreground uppercase">Total Analyzed Area</p>
+                            <p className="text-lg font-mono font-bold">{results.totalAreaHectares.toFixed(2)} <span className="text-xs text-muted-foreground">Ha</span></p>
                          </div>
                          <Button variant="ghost" size="icon" onClick={downloadResults} title="Export JSON">
                             <TbDownload size={18} />
@@ -269,25 +285,27 @@ export function ZonalStatisticsModal({
                       </div>
 
                       <div className="space-y-3">
-                         {results.legend
-                          .filter(l => results.stats[l.label] > 0)
-                          .sort((a, b) => results.stats[b.label] - results.stats[a.label])
+                         {results.stats
+                          .filter(s => s.pixelCount > 0)
+                          .sort((a, b) => b.areaM2 - a.areaM2)
                           .map((item) => {
-                            const percentage = (results.stats[item.label] / results.totalArea) * 100
                             return (
-                              <div key={item.value} className="space-y-1.5">
+                              <div key={item.classValue} className="space-y-1.5">
                                 <div className="flex justify-between text-[11px]">
                                   <div className="flex items-center gap-2">
                                     <div className="h-2 w-2 rounded-full" style={{ backgroundColor: item.color }} />
                                     <span className="font-medium">{item.label}</span>
                                   </div>
-                                  <span className="font-mono font-bold text-primary">{percentage.toFixed(1)}%</span>
+                                  <div className="flex items-center gap-2">
+                                    <span className="text-[10px] text-muted-foreground">{item.hectares.toFixed(1)} ha</span>
+                                    <span className="font-mono font-bold text-primary">{item.percentage.toFixed(1)}%</span>
+                                  </div>
                                 </div>
                                 <div className="h-1.5 w-full bg-accent rounded-full overflow-hidden">
                                   <div 
                                     className="h-full transition-all duration-1000 ease-out" 
                                     style={{ 
-                                      width: `${percentage}%`,
+                                      width: `${item.percentage}%`,
                                       backgroundColor: item.color 
                                     }} 
                                   />

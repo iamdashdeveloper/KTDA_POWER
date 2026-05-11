@@ -317,21 +317,45 @@ export async function getWorldCoverStats(params: LandCoverStatsParams) {
         }
 
         const histogram = result?.Map ?? {};
+        const PIXEL_AREA_M2 = 100;
+        const SQM_PER_HECTARE = 10000;
+        const SQM_PER_KM2 = 1000000;
 
-        const stats: Record<string, number> = {};
+        const classStats: any[] = [];
+        let totalPixelAreaM2 = 0;
 
         for (const [key, value] of Object.entries(histogram)) {
+          const pixelCount = value as number;
+          const areaM2 = pixelCount * PIXEL_AREA_M2;
           const classValue = Number(key);
-          const label =
-            ESA_WORLDCOVER_LEGEND.find((c) => c.value === classValue)
-              ?.label || `Class ${classValue}`;
+          const legendItem = ESA_WORLDCOVER_LEGEND.find((c) => c.value === classValue);
+          const label = legendItem?.label || `Class ${classValue}`;
+          
+          totalPixelAreaM2 += areaM2;
 
-          stats[label] = (value as number) * 0.0001; // m² → km²
+          classStats.push({
+            classValue,
+            label,
+            color: legendItem?.color || "#000000",
+            pixelCount,
+            areaM2,
+            hectares: areaM2 / SQM_PER_HECTARE,
+            km2: areaM2 / SQM_PER_KM2
+          });
         }
 
-        resolve({
-          stats,
-          legend: ESA_WORLDCOVER_LEGEND,
+        classStats.forEach(stat => {
+          stat.percentage = totalPixelAreaM2 > 0 ? (stat.areaM2 / totalPixelAreaM2) * 100 : 0;
+        });
+
+        eeGeometry.area().evaluate((geomAreaM2: number) => {
+          resolve({
+            stats: classStats,
+            totalAnalyzedAreaM2: totalPixelAreaM2,
+            totalAnalyzedHectares: totalPixelAreaM2 / SQM_PER_HECTARE,
+            geometryAreaM2: geomAreaM2,
+            legend: ESA_WORLDCOVER_LEGEND,
+          });
         });
       });
   });
