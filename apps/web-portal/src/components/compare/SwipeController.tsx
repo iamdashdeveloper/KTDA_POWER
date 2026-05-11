@@ -1,6 +1,5 @@
-import React, { useState, useEffect, useRef } from "react"
+import React, { useRef } from "react"
 import { useMapStore } from "@/store/useMapStore"
-import { cn } from "@workspace/ui/lib/utils"
 import { TbGripVertical } from "react-icons/tb"
 
 export const SwipeController: React.FC = () => {
@@ -10,7 +9,7 @@ export const SwipeController: React.FC = () => {
 
   if (!compareConfig.active) return null
 
-  const handleMouseDown = (e: React.MouseEvent) => {
+  const handleMouseDown = () => {
     isDragging.current = true
     document.addEventListener("mousemove", handleMouseMove)
     document.addEventListener("mouseup", handleMouseUp)

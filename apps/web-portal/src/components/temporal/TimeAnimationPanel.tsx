@@ -13,8 +13,6 @@ import {
   TbPlayerSkipForward,
   TbHistory,
   TbCalendarTime,
-  TbSettings,
-  TbDownload,
   TbRefresh
 } from "react-icons/tb"
 import { ApiClient } from "@/lib/api"

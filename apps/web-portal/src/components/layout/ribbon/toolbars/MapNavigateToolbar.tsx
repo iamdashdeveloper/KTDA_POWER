@@ -1,8 +1,7 @@
 import React from 'react';
-import { Pointer, Maximize } from 'lucide-react';
+import { Pointer } from 'lucide-react';
 import { RibbonGroup } from '../RibbonGroup';
 import { RibbonButton } from '../RibbonButton';
-import { RibbonSmallButton } from '../RibbonSmallButton';
 
 // Modular Tools
 import { ZoomToHome } from '../tools/navigation/ZoomToHome';

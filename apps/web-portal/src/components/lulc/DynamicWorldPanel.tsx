@@ -53,7 +53,6 @@ export const DynamicWorldPanel: React.FC = () => {
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [availableDates, setAvailableDates] = useState<string[]>([])
-  const [isLoadingDates, setIsLoadingDates] = useState(false)
 
   // Local state for date inputs
   const [startDate, setStartDate] = useState(dynamicWorldConfig.startDate)
@@ -100,7 +99,6 @@ export const DynamicWorldPanel: React.FC = () => {
 
   // Load available dates
   const loadAvailableDates = useCallback(async () => {
-    setIsLoadingDates(true)
     try {
       const res = await ApiClient.get<{ dates: string[] }>(
         `/gee/dynamic-world/dates?startDate=${startDate}&endDate=${endDate}`
@@ -109,7 +107,6 @@ export const DynamicWorldPanel: React.FC = () => {
     } catch (err) {
       console.error("[DynamicWorld] Failed to load dates:", err)
     } finally {
-      setIsLoadingDates(false)
     }
   }, [startDate, endDate])
 
