@@ -2,7 +2,6 @@ import React, { useState } from "react"
 import {
   Mountain,
   Cpu,
-  Target,
   Network,
   Radio,
   AlertTriangle,
@@ -16,6 +15,9 @@ import {
   Cloud,
   Loader2,
 } from "lucide-react"
+import { TbMapQuestion } from "react-icons/tb";
+// import { TbMapPinHeart } from "react-icons/tb";
+import { LuWaypoints } from "react-icons/lu";
 import { FcLandscape } from "react-icons/fc";
 import { RibbonGroup } from "../RibbonGroup"
 import { RibbonButton } from "../RibbonButton"
@@ -31,9 +33,10 @@ import { useProjectStore } from "@/store/useProjectStore"
 import { LandCoverLegend } from "../../panels/LandCoverLegend"
 import { TbGraph } from "react-icons/tb"
 import { ZonalStatisticsModal } from "../../modals/ZonalStatisticsModal"
-
+import { TbEaseInOutControlPoints } from "react-icons/tb";
 import { GeoprocessingPanel } from "../../../geoprocessing/GeoprocessingPanel"
-
+import { VscLayersDot } from "react-icons/vsc";
+import { TbMapBolt } from "react-icons/tb";
 interface AnalysisToolbarProps {
   onToolClick: (toolId: string) => void
 }
@@ -74,24 +77,27 @@ export const AnalysisToolbar: React.FC<AnalysisToolbarProps> = ({
       <RibbonSeparator />
 
       <RibbonGroup label="Cross Section">
-        <RibbonButton
-          icon={<Activity size={24} />}
-          label="Two Points"
+        <div className="flex flex-col">
+          <RibbonSmallButton
+          icon={<LuWaypoints />
+}
+          label="Across Points"
           disabled={!is3D}
           onClick={() => executeTerrainCommand("start-cross-section")}
         />
-        <RibbonButton
-          icon={<Zap size={24} />}
-          label="Draw Line"
+        <RibbonSmallButton
+          icon={<TbEaseInOutControlPoints size={24} />}
+          label="Along Line"
           disabled={!is3D}
           onClick={() => executeTerrainCommand("start-polyline-cross-section")}
         />
-        <RibbonButton
-          icon={<Target size={24} />}
+        <RibbonSmallButton
+          icon={<VscLayersDot size={24} />}
           label="By Feature"
           disabled={!is3D}
           onClick={() => executeTerrainCommand("start-feature-cross-section")}
         />
+        </div>
 
         <div className="ml-1 flex flex-col justify-center gap-1 border-l border-border/50 pl-2">
           <RibbonSmallButton
@@ -122,7 +128,7 @@ export const AnalysisToolbar: React.FC<AnalysisToolbarProps> = ({
           onClick={() => openPanel("right", <GeoprocessingPanel />, "Geoprocessing Toolbox")}
         />
         <RibbonButton
-          icon={<Target size={24} />}
+          icon={<TbMapQuestion size={24} />}
           label="Suitability"
           onClick={() => onToolClick("suitability-modelling")}
         />
@@ -185,7 +191,7 @@ export const AnalysisToolbar: React.FC<AnalysisToolbarProps> = ({
           />
           <RibbonSmallButton
             icon={isLoadingLandCover ? <Loader2 size={14} className="animate-spin" /> : <FcLandscape size={14} />}
-            label="Land Cover"
+            label="ESA Land Cover"
     onClick={async () => {
       console.log("[AnalysisToolbar] Load land cover data")
       try {
@@ -209,6 +215,22 @@ export const AnalysisToolbar: React.FC<AnalysisToolbarProps> = ({
             label="Zonal Statistics"
             onClick={() => setIsZonalStatsOpen(true)}
           />
+        </div>
+        <div className="ml-1 flex flex-col justify-center gap-1 border-l border-border/50 pl-2">
+          <RibbonSmallButton
+            icon={<TbMapBolt size={14} />}
+            label="Dynamic World LULC"
+            onClick={() => onToolClick("flood-prediction")}
+          />
+          <RibbonSmallButton
+            icon={<Box size={14} />}
+            label="Create Model"
+            onClick={() => {
+              console.log("[AnalysisToolbar] Create Model clicked")
+              setIsCreateHydroModelOpen(true)
+            }}
+          />
+          
         </div>
       </RibbonGroup>
 
