@@ -84,13 +84,16 @@ export async function geeRoutes(fastify: FastifyInstance) {
       }
 
       const parsedYear = year ? parseInt(year, 10) : 2021
+      console.log(`[GEE] Starting zonal stats for year ${parsedYear}...`)
+      
       const result = await getWorldCoverStats({ geometry, year: parsedYear })
       return reply.status(200).send(result)
-    } catch (error) {
-      fastify.log.error(error)
+    } catch (error: any) {
+      console.error("[GEE Stats Error]", error)
       return reply.status(500).send({
         error: "Failed to compute land cover statistics",
-        details: error instanceof Error ? error.message : "Unknown error",
+        details: error.message || "Unknown error",
+        stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
       })
     }
   })
