@@ -18,6 +18,16 @@ export default fp(async (fastify) => {
     console.error("[Postgres Pool Error]", err.message)
   })
 
+  // Verify connection on startup
+  try {
+    const client = await pool.connect()
+    await client.query("SELECT 1")
+    client.release()
+    console.log("[Database] Connection pool initialized and verified")
+  } catch (err) {
+    console.error("[Database] Initial connection failed:", err)
+  }
+
   // Create the Prisma adapter
   const adapter = new PrismaPg(pool)
 

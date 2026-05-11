@@ -72,32 +72,50 @@ let initialized = false;
 export async function initializeGEE(): Promise<void> {
   if (initialized) return;
 
-  const keyFilePath = process.env.GEE_SERVICE_ACCOUNT_KEY_FILE;
+  let keyFilePath = process.env.GEE_SERVICE_ACCOUNT_KEY_FILE;
+
+  // If path is relative, resolve it from the workspace root or apps/api
+  if (keyFilePath && !path.isAbsolute(keyFilePath)) {
+    const rootPath = path.resolve(process.cwd(), "apps/api");
+    const possiblePath = path.resolve(rootPath, keyFilePath);
+    if (fs.existsSync(possiblePath)) {
+      keyFilePath = possiblePath;
+    } else {
+      keyFilePath = path.resolve(process.cwd(), keyFilePath);
+    }
+  }
 
   if (!keyFilePath) {
-    throw new Error("[GEE] Missing GEE_SERVICE_ACCOUNT_KEY_FILE env var");
+    throw new Error("[GEE] Missing GEE_SERVICE_ACCOUNT_KEY_FILE environment variable");
   }
 
   if (!fs.existsSync(keyFilePath)) {
-    throw new Error(`[GEE] Key file not found at: ${keyFilePath}`);
+    throw new Error(`[GEE] Credentials file not found at: ${path.resolve(keyFilePath)}`);
   }
 
+  console.log(`[GEE] Loading credentials from: ${keyFilePath}`);
   const raw = fs.readFileSync(keyFilePath, "utf-8");
-
   const key = JSON.parse(raw);
 
   if (!key.private_key || !key.client_email) {
     throw new Error("[GEE] Invalid service account file");
   }
 
-  // 🔥 CRITICAL FIX: normalize PEM formatting for JWT signing
-  key.private_key = key.private_key
-    .replace(/\\n/g, "\n")   // escaped → real newline
-    .replace(/\r\n/g, "\n")  // Windows line endings
-    .replace(/\r/g, "\n")    // legacy Mac
-    .trim();
+  // 🔥 AGGRESSIVE FIX: Ensure private_key is perfectly formatted for JWT
+  if (typeof key.private_key === 'string') {
+    key.private_key = key.private_key
+      .replace(/\\n/g, '\n')     // Handle escaped newlines
+      .replace(/\n/g, '\n')      // Ensure actual newlines
+      .replace(/\r/g, '')        // Remove carriage returns
+      .trim();
+    
+    // Ensure header/footer are correctly placed
+    if (!key.private_key.includes('-----BEGIN PRIVATE KEY-----')) {
+       console.error("[GEE] Private key is missing header!");
+    }
+  }
 
-  console.log("[GEE] Using service account:", key.client_email);
+  console.log("[GEE] Authenticating with:", key.client_email);
 
   await new Promise<void>((resolve, reject) => {
     ee.data.authenticateViaPrivateKey(
