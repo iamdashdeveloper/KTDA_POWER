@@ -27,6 +27,7 @@ interface ToolModalProps {
   onClose: () => void
 }
 
+// ToolModal component for geoprocessing tools
 export const ToolModal: React.FC<ToolModalProps> = ({ toolId, onClose }) => {
   const { projectFeatures } = useMapStore()
   const { addAnalysisLayer, analysisLayers } = useGeoprocessingStore()
