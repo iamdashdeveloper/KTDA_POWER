@@ -7,7 +7,7 @@ import { RibbonSmallButton } from '../RibbonSmallButton';
 // Modular Tools
 import { ZoomToHome } from '../tools/navigation/ZoomToHome';
 import { ZoomToLocation } from '../tools/navigation/ZoomToLocation';
-import { ResetNorth } from '../tools/navigation/ResetNorth';
+
 import { ZoomBox } from '../tools/navigation/ZoomBox';
 
 interface MapNavigateToolbarProps {
@@ -32,15 +32,7 @@ export const MapNavigateToolbar: React.FC<MapNavigateToolbarProps> = ({
         <div className="flex flex-col gap-1">
           <ZoomToHome onClick={onToolClick} />
           <ZoomToLocation onClick={onToolClick} />
-        </div>
-
-        <div className="flex flex-col gap-1">
-          <ResetNorth onClick={onToolClick} />
           <ZoomBox onClick={onToolClick} />
-        </div>
-
-        <div className="flex flex-col gap-1">
-          <RibbonSmallButton icon={<Maximize size={14} />} label="Full Extent" onClick={() => onToolClick('full-extent')} />
         </div>
       </div>
     </RibbonGroup>

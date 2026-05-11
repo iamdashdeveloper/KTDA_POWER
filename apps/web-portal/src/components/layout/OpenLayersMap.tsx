@@ -40,6 +40,7 @@ import { MeasureLogic } from "./ribbon/tools/inquiry/MeasureLogic"
 import { GenerateChainnageLogic } from "./ribbon/tools/inquiry/GenerateChainnageLogic"
 import { DrawingLogic } from "./ribbon/tools/drawing/DrawingLogic"
 import { AnalysisLogic } from "./map-logic/AnalysisLogic"
+import { SwipeController } from "../compare/SwipeController"
 
 import { useLayout } from "@/context/LayoutContext"
 import { IdentifyPanel } from "./panels/IdentifyPanel"
@@ -65,6 +66,10 @@ export const OpenLayersMap: React.FC = () => {
     viewCenter,
     viewZoom,
     landCoverTileUrl,
+    dynamicWorldTileUrl,
+    dynamicWorldConfig,
+    compareConfig,
+    animationConfig,
   } = useMapStore()
 
   // Ref for tool to use inside event listeners
@@ -83,8 +88,10 @@ export const OpenLayersMap: React.FC = () => {
     satellite: TileLayer<XYZ>
     reference: TileLayer<XYZ>
     landcover: TileLayer<XYZ>
+    dynamicworld: TileLayer<XYZ>
     features: VectorLayer<VectorSource>
     issues: VectorLayer<VectorSource>
+    animation: TileLayer<XYZ>
   } | null>(null)
 
   // Sync Individual Feature Visibility
@@ -135,6 +142,15 @@ export const OpenLayersMap: React.FC = () => {
       opacity: 0.7,
       zIndex: 5,
     })
+    const dynamicworld = new TileLayer({
+      source: new XYZ({
+        url: "",
+        crossOrigin: "anonymous",
+      }),
+      visible: false,
+      opacity: 0.85,
+      zIndex: 6,
+    })
     const featuresSource = new VectorSource()
     const features = new VectorLayer({
       source: featuresSource,
@@ -147,11 +163,17 @@ export const OpenLayersMap: React.FC = () => {
       style: issueStyleFunction,
       zIndex: 20,
     })
-    layersRef.current = { osm, satellite, reference, landcover, features, issues }
+    const animation = new TileLayer({
+      source: new XYZ({ url: "", crossOrigin: "anonymous" }),
+      visible: false,
+      zIndex: 100, // Top most raster
+    })
+
+    layersRef.current = { osm, satellite, reference, landcover, dynamicworld, features, issues, animation }
 
     const map = new Map({
       target: mapRef.current,
-      layers: [satellite, osm, landcover, reference, features, issues],
+      layers: [satellite, osm, landcover, dynamicworld, reference, features, issues, animation],
       interactions: defaultInteractions().extend([]),
       view: new View({
         center: fromLonLat(viewCenter),
@@ -256,6 +278,9 @@ export const OpenLayersMap: React.FC = () => {
         case "landcover":
           layersRef.current!.landcover.setVisible(layer.visible)
           break
+        case "dynamicworld":
+          layersRef.current!.dynamicworld.setVisible(layer.visible)
+          break
         case "project-features":
           layersRef.current!.features.setVisible(layer.visible)
           break
@@ -277,6 +302,152 @@ export const OpenLayersMap: React.FC = () => {
       )
     }
   }, [landCoverTileUrl])
+
+  // Update Dynamic World URL dynamically
+  React.useEffect(() => {
+    if (layersRef.current?.dynamicworld && dynamicWorldTileUrl) {
+      layersRef.current.dynamicworld.setSource(
+        new XYZ({
+          url: dynamicWorldTileUrl,
+          crossOrigin: "anonymous",
+        })
+      )
+    }
+  }, [dynamicWorldTileUrl])
+
+  // Sync Dynamic World opacity
+  React.useEffect(() => {
+    if (layersRef.current?.dynamicworld) {
+      layersRef.current.dynamicworld.setOpacity(dynamicWorldConfig.opacity)
+    }
+  }, [dynamicWorldConfig.opacity])
+
+  // Swipe Tool Logic (Clipping)
+  React.useEffect(() => {
+    if (!mapInstanceRef.current || !layersRef.current) return
+
+    const { active, leftLayer, rightLayer, swipePosition } = compareConfig
+    const map = mapInstanceRef.current
+
+    // Reset all raster layers first
+    const rasterLayers = [
+      layersRef.current.osm,
+      layersRef.current.satellite,
+      layersRef.current.landcover,
+      layersRef.current.dynamicworld
+    ]
+
+    rasterLayers.forEach(l => {
+      if ((l as any).swipePrerender) {
+        l.un('prerender', (l as any).swipePrerender)
+      }
+      if ((l as any).swipePostrender) {
+        l.un('postrender', (l as any).swipePostrender)
+      }
+      ;(l as any).swipePrerender = null
+      ;(l as any).swipePostrender = null
+      // Restore default z-index if needed
+      if (l === layersRef.current?.landcover) l.setZIndex(5)
+      if (l === layersRef.current?.dynamicworld) l.setZIndex(6)
+    })
+
+    if (!active) {
+      map.render()
+      return
+    }
+
+    const getLayer = (id: string) => {
+      if (id === 'satellite') return layersRef.current?.satellite
+      if (id === 'landcover') return layersRef.current?.landcover
+      if (id === 'dynamicworld') return layersRef.current?.dynamicworld
+      if (id === 'osm') return layersRef.current?.osm
+      return null
+    }
+
+    const left = getLayer(leftLayer)
+    const right = getLayer(rightLayer)
+
+    if (left && right) {
+      // Ensure they are visible and on top for comparison
+      left.setVisible(true)
+      right.setVisible(true)
+      left.setZIndex(50)
+      right.setZIndex(51)
+
+      const onPrerenderLeft = (event: any) => {
+        const ctx = event.context
+        const mapSize = map.getSize()!
+        const pixelRatio = event.frameState.pixelRatio
+        const width = mapSize[0] * (swipePosition / 100) * pixelRatio
+        ctx.save()
+        ctx.beginPath()
+        ctx.rect(0, 0, width, mapSize[1] * pixelRatio)
+        ctx.clip()
+      }
+
+      const onPrerenderRight = (event: any) => {
+        const ctx = event.context
+        const mapSize = map.getSize()!
+        const pixelRatio = event.frameState.pixelRatio
+        const width = mapSize[0] * (swipePosition / 100) * pixelRatio
+        ctx.save()
+        ctx.beginPath()
+        ctx.rect(width, 0, (mapSize[0] * pixelRatio) - width, mapSize[1] * pixelRatio)
+        ctx.clip()
+      }
+
+      const onPostrender = (event: any) => {
+        const ctx = event.context
+        ctx.restore()
+      }
+
+      left.on('prerender', onPrerenderLeft)
+      left.on('postrender', onPostrender)
+      ;(left as any).swipePrerender = onPrerenderLeft
+      ;(left as any).swipePostrender = onPostrender
+
+      right.on('prerender', onPrerenderRight)
+      right.on('postrender', onPostrender)
+      ;(right as any).swipePrerender = onPrerenderRight
+      ;(right as any).swipePostrender = onPostrender
+    }
+
+    map.render()
+
+    return () => {
+      rasterLayers.forEach(l => {
+        if ((l as any).swipePrerender) {
+          l.un('prerender', (l as any).swipePrerender)
+        }
+        if ((l as any).swipePostrender) {
+          l.un('postrender', (l as any).swipePostrender)
+        }
+      })
+    }
+  }, [compareConfig])
+
+  // Animation Tool Logic
+  React.useEffect(() => {
+    if (!layersRef.current) return
+    const { active, frames, currentFrameIndex } = animationConfig
+    const animLayer = layersRef.current.animation
+
+    if (!active || frames.length === 0) {
+      animLayer.setVisible(false)
+      return
+    }
+
+    const currentFrame = frames[currentFrameIndex]
+    if (currentFrame) {
+      animLayer.setVisible(true)
+      animLayer.setSource(
+        new XYZ({
+          url: currentFrame.tileUrl,
+          crossOrigin: "anonymous",
+        })
+      )
+    }
+  }, [animationConfig.active, animationConfig.frames, animationConfig.currentFrameIndex])
 
   // Load Scratch Layers (Session/Independent)
   React.useEffect(() => {
@@ -663,6 +834,9 @@ export const OpenLayersMap: React.FC = () => {
       <div ref={mapRef} className="absolute inset-0" />
 
       <LoadingOverlay isLoading={isLoading} />
+      
+      {/* Swipe Divider Layer */}
+      <SwipeController />
 
       {error && (
         <div className="absolute top-4 left-1/2 z-50 -translate-x-1/2">

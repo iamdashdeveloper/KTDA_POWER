@@ -35,8 +35,11 @@ import { TbGraph } from "react-icons/tb"
 import { ZonalStatisticsModal } from "../../modals/ZonalStatisticsModal"
 import { TbEaseInOutControlPoints } from "react-icons/tb";
 import { GeoprocessingPanel } from "../../../geoprocessing/GeoprocessingPanel"
+import { DynamicWorldPanel } from "../../../lulc/DynamicWorldPanel"
 import { VscLayersDot } from "react-icons/vsc";
-import { TbMapBolt } from "react-icons/tb";
+import { TbMapBolt, TbColumns, TbHistory } from "react-icons/tb";
+import { CompareLayersPanel } from "../../../compare/CompareLayersPanel"
+import { TimeAnimationPanel } from "../../../temporal/TimeAnimationPanel"
 interface AnalysisToolbarProps {
   onToolClick: (toolId: string) => void
 }
@@ -220,17 +223,18 @@ export const AnalysisToolbar: React.FC<AnalysisToolbarProps> = ({
           <RibbonSmallButton
             icon={<TbMapBolt size={14} />}
             label="Dynamic World LULC"
-            onClick={() => onToolClick("flood-prediction")}
+            onClick={() => openPanel("right", <DynamicWorldPanel />, "Dynamic World LULC")}
           />
           <RibbonSmallButton
-            icon={<Box size={14} />}
-            label="Create Model"
-            onClick={() => {
-              console.log("[AnalysisToolbar] Create Model clicked")
-              setIsCreateHydroModelOpen(true)
-            }}
+            icon={<TbColumns size={14} />}
+            label="Compare Layers"
+            onClick={() => openPanel("right", <CompareLayersPanel />, "Compare Layers")}
           />
-          
+          <RibbonSmallButton
+            icon={<TbHistory size={14} />}
+            label="Time Animation"
+            onClick={() => openPanel("right", <TimeAnimationPanel />, "Time Animation")}
+          />
         </div>
       </RibbonGroup>
 

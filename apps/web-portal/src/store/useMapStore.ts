@@ -58,7 +58,7 @@ interface MapStore {
   // Weather Panel
   weatherPanelOpen: boolean
   setWeatherPanelOpen: (open: boolean) => void
-  // Land Cover
+  // Land Cover (ESA WorldCover)
   landCoverTileUrl: string | null
   setLandCoverTileUrl: (url: string | null) => void
   landCoverConfig: {
@@ -67,6 +67,34 @@ interface MapStore {
     paletteOverrides: Record<number, string>
   }
   setLandCoverConfig: (config: Partial<MapStore["landCoverConfig"]>) => void
+  // Dynamic World
+  dynamicWorldTileUrl: string | null
+  setDynamicWorldTileUrl: (url: string | null) => void
+  dynamicWorldConfig: {
+    startDate: string
+    endDate: string
+    opacity: number
+    visibleClasses: number[]
+    paletteOverrides: Record<number, string>
+  }
+  setDynamicWorldConfig: (config: Partial<MapStore["dynamicWorldConfig"]>) => void
+  // Compare Layers
+  compareConfig: {
+    active: boolean
+    leftLayer: string
+    rightLayer: string
+    swipePosition: number
+  }
+  setCompareConfig: (config: Partial<MapStore["compareConfig"]>) => void
+  // Time Animation
+  animationConfig: {
+    active: boolean
+    frames: { date: string; tileUrl: string }[]
+    currentFrameIndex: number
+    playing: boolean
+    speed: "slow" | "medium" | "fast"
+  }
+  setAnimationConfig: (config: Partial<MapStore["animationConfig"]>) => void
 }
 
 export const useMapStore = create<MapStore>((set) => ({
@@ -87,6 +115,7 @@ export const useMapStore = create<MapStore>((set) => ({
     },
     { id: "project-issues", name: "Map Issues", visible: true, type: "issue" },
     { id: "landcover", name: "ESA Land Cover", visible: false, type: "base" },
+    { id: "dynamicworld", name: "Dynamic World", visible: false, type: "base" },
   ],
   toggleLayer: (id) =>
     set((state) => ({
@@ -174,5 +203,39 @@ export const useMapStore = create<MapStore>((set) => ({
   setLandCoverConfig: (config) =>
     set((state) => ({
       landCoverConfig: { ...state.landCoverConfig, ...config },
+    })),
+  dynamicWorldTileUrl: null,
+  setDynamicWorldTileUrl: (url) => set({ dynamicWorldTileUrl: url }),
+  dynamicWorldConfig: {
+    startDate: new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString().split("T")[0],
+    endDate: new Date().toISOString().split("T")[0],
+    opacity: 0.85,
+    visibleClasses: [],
+    paletteOverrides: {},
+  },
+  setDynamicWorldConfig: (config) =>
+    set((state) => ({
+      dynamicWorldConfig: { ...state.dynamicWorldConfig, ...config },
+    })),
+  compareConfig: {
+    active: false,
+    leftLayer: "satellite",
+    rightLayer: "dynamicworld",
+    swipePosition: 50,
+  },
+  setCompareConfig: (config) =>
+    set((state) => ({
+      compareConfig: { ...state.compareConfig, ...config },
+    })),
+  animationConfig: {
+    active: false,
+    frames: [],
+    currentFrameIndex: 0,
+    playing: false,
+    speed: "medium",
+  },
+  setAnimationConfig: (config) =>
+    set((state) => ({
+      animationConfig: { ...state.animationConfig, ...config },
     })),
 }))

@@ -6,6 +6,12 @@ import {
   LandCoverTileParams,
   LandCoverStatsParams,
 } from "../../services/geeService.js"
+import {
+  getDynamicWorldTileUrl,
+  getDynamicWorldAvailableDates,
+  getDynamicWorldTimeline,
+  DynamicWorldTileParams,
+} from "../../services/dynamicWorldService.js"
 
 export async function geeRoutes(fastify: FastifyInstance) {
   // Get XYZ tile URL for ESA WorldCover (10m)
@@ -109,7 +115,6 @@ export async function geeRoutes(fastify: FastifyInstance) {
       const { projectId, year } = request.query
       const parsedYear = year ? parseInt(year, 10) : 2021
 
-      // 1. Fetch project location
       const [project]: any[] = await fastify.prisma.$queryRaw`
         SELECT ST_AsGeoJSON(location) as geojson 
         FROM "Project" 
@@ -122,14 +127,11 @@ export async function geeRoutes(fastify: FastifyInstance) {
 
       const location = JSON.parse(project.geojson)
       
-      // 2. Create a buffer if it's a point (most projects are points currently)
-      // If it's already a polygon, use it. If point, buffer by ~5km
       let geometry = location
       if (location.type === "Point") {
-        // Simple square buffer around the point (~5km)
         const lon = location.coordinates[0]
         const lat = location.coordinates[1]
-        const d = 0.045 // approx 5km in degrees
+        const d = 0.045
         geometry = {
           type: "Polygon",
           coordinates: [[
@@ -148,6 +150,95 @@ export async function geeRoutes(fastify: FastifyInstance) {
       fastify.log.error(error)
       return reply.status(500).send({
         error: "Failed to compute project land cover statistics",
+        details: error instanceof Error ? error.message : "Unknown error",
+      })
+    }
+  })
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // Dynamic World Endpoints
+  // ─────────────────────────────────────────────────────────────────────────
+
+  // GET Dynamic World tile URL
+  fastify.get<{
+    Querystring: {
+      startDate?: string
+      endDate?: string
+      visibleClasses?: string
+      paletteOverrides?: string
+      opacity?: string
+    }
+  }>("/gee/dynamic-world/tiles", async (request, reply) => {
+    try {
+      const { startDate, endDate, visibleClasses, paletteOverrides, opacity } = request.query
+
+      const params: DynamicWorldTileParams = {
+        startDate,
+        endDate,
+      }
+
+      if (visibleClasses) {
+        params.visibleClasses = visibleClasses.split(",").map((v) => parseInt(v, 10))
+      }
+
+      if (paletteOverrides) {
+        try {
+          params.paletteOverrides = JSON.parse(paletteOverrides)
+        } catch (e) {
+          fastify.log.warn("Failed to parse Dynamic World paletteOverrides JSON")
+        }
+      }
+
+      if (opacity) {
+        params.opacity = parseFloat(opacity)
+      }
+
+      const result = await getDynamicWorldTileUrl(params)
+      return reply.status(200).send(result)
+    } catch (error) {
+      fastify.log.error(error)
+      return reply.status(500).send({
+        error: "Failed to generate Dynamic World tiles",
+        details: error instanceof Error ? error.message : "Unknown error",
+      })
+    }
+  })
+
+  // GET available Dynamic World dates
+  fastify.get<{
+    Querystring: {
+      startDate?: string
+      endDate?: string
+    }
+  }>("/gee/dynamic-world/dates", async (request, reply) => {
+    try {
+      const { startDate, endDate } = request.query
+      const result = await getDynamicWorldAvailableDates(startDate, endDate)
+      return reply.status(200).send(result)
+    } catch (error) {
+      fastify.log.error(error)
+      return reply.status(500).send({
+        error: "Failed to fetch Dynamic World available dates",
+        details: error instanceof Error ? error.message : "Unknown error",
+      })
+    }
+  })
+
+  // GET Dynamic World timeline frames
+  fastify.get<{
+    Querystring: {
+      startDate?: string
+      endDate?: string
+    }
+  }>("/gee/dynamic-world/timeline", async (request, reply) => {
+    try {
+      const { startDate, endDate } = request.query
+      const result = await getDynamicWorldTimeline(startDate, endDate)
+      return reply.status(200).send(result)
+    } catch (error) {
+      fastify.log.error(error)
+      return reply.status(500).send({
+        error: "Failed to fetch Dynamic World timeline",
         details: error instanceof Error ? error.message : "Unknown error",
       })
     }
