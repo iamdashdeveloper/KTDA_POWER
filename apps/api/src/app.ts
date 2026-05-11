@@ -38,7 +38,7 @@ import path from "path"
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
-
+// the cors handling works now.. caution when changing it
 export async function createApp() {
   const fastify = Fastify({
     logger: env.NODE_ENV === "development",
