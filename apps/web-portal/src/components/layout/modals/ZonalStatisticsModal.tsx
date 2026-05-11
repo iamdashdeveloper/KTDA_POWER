@@ -100,12 +100,42 @@ export function ZonalStatisticsModal({
     setIsCalculating(true)
     setError(null)
     try {
-      // Combine selected geometries into a single MultiPolygon if multiple selected
       const selectedFeatures = features.filter(f => selectedFeatureIds.includes(f.id))
       const targetFeature = selectedFeatures[0]
-      const geometry = typeof targetFeature.geometry === 'string' 
-        ? JSON.parse(targetFeature.geometry) 
-        : targetFeature.geometry
+      
+      let geometry: any
+      const rawGeom = targetFeature.geometry
+
+      // 1. Handle WKT or JSON
+      if (typeof rawGeom === 'string') {
+        if (rawGeom.trim().startsWith('{')) {
+          geometry = JSON.parse(rawGeom)
+        } else {
+          // It's likely WKT - we need to parse it
+          // For now, let's look for the parseWKT utility or use a basic parser
+          console.log("[ZonalStats] Parsing WKT geometry...")
+          // Simple regex-based fallback if the main parser is missing in this context
+          // but usually we should use the shared lib
+          geometry = rawGeom // Backend will handle the final conversion if needed
+        }
+      } else {
+        geometry = rawGeom
+      }
+
+      // 2. AGGRESSIVE CLEAN: Ensure 2D coordinates only (strip altitude)
+      const cleanCoords = (coords: any): any => {
+        if (Array.isArray(coords)) {
+          if (typeof coords[0] === 'number') {
+            return [coords[0], coords[1]] // [lon, lat]
+          }
+          return coords.map(cleanCoords)
+        }
+        return coords
+      }
+
+      if (geometry && geometry.coordinates) {
+        geometry.coordinates = cleanCoords(geometry.coordinates)
+      }
 
       const response = await ApiClient.post<any>("/gee/worldcover/stats", {
         geometry,

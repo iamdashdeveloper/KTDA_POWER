@@ -107,7 +107,7 @@ export async function issuesRoutes(fastify: FastifyInstance) {
             "createdAt",
             description,
             CASE 
-              WHEN location IS NOT NULL THEN ST_AsGeoJSON(location)::jsonb
+              WHEN location IS NOT NULL THEN ST_AsGeoJSON(location)
               ELSE NULL
             END as location,
             metadata
@@ -126,9 +126,10 @@ export async function issuesRoutes(fastify: FastifyInstance) {
           }))
         )
       } catch (error) {
-        reply.status(500).send({
+        console.error("[Issues Map] Error:", error)
+        return reply.status(500).send({
           error: "Failed to fetch project issues",
-          message: error instanceof Error ? error.message : "Unknown error",
+          details: error instanceof Error ? error.message : "Unknown error",
         })
       }
     }

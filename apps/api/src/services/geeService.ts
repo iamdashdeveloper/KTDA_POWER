@@ -286,10 +286,20 @@ export async function getWorldCoverStats(params: LandCoverStatsParams) {
   await initializeGEE();
 
   const { geometry: rawGeometry, year = 2021 } = params;
+  console.log(`[GEE Stats] Input Geometry Type: ${rawGeometry?.type}`);
+  
   const geometry = cleanGeometry(rawGeometry);
+  console.log(`[GEE Stats] Cleaned Geometry: ${JSON.stringify(geometry).substring(0, 500)}...`);
 
   const image = getWorldCoverImage(year);
-  const eeGeometry = ee.Geometry(geometry);
+  
+  let eeGeometry;
+  try {
+    eeGeometry = ee.Geometry(geometry);
+  } catch (eeErr: any) {
+    console.error("[GEE Stats] ee.Geometry creation failed:", eeErr);
+    throw new Error(`Failed to create Earth Engine geometry: ${eeErr.message}`);
+  }
 
   return new Promise((resolve, reject) => {
     image

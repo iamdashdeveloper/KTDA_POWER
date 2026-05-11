@@ -45,7 +45,7 @@ export async function featuresRoutes(fastify: FastifyInstance) {
             "projectId",
             name,
             CASE 
-              WHEN geometry IS NOT NULL THEN ST_AsGeoJSON(geometry)::jsonb
+              WHEN geometry IS NOT NULL THEN ST_AsGeoJSON(geometry)
               ELSE NULL
             END as geometry,
             details,
@@ -110,7 +110,7 @@ export async function featuresRoutes(fastify: FastifyInstance) {
             f."projectId",
             f.name,
             CASE 
-              WHEN f.geometry IS NOT NULL THEN ST_AsGeoJSON(f.geometry)::jsonb
+              WHEN f.geometry IS NOT NULL THEN ST_AsGeoJSON(f.geometry)
               ELSE NULL
             END as geometry,
             f.details,
@@ -136,10 +136,17 @@ export async function featuresRoutes(fastify: FastifyInstance) {
           }))
         )
       } catch (error) {
-        console.error("[Features] Error fetching project features:", error)
+        console.error("[Features] Critical Error fetching project features:", error)
+        if (error instanceof Error) {
+          console.error("  Stack trace:", error.stack)
+        }
         return reply
           .code(500)
-          .send({ error: "Failed to fetch project features" })
+          .send({ 
+            error: "Failed to fetch project features", 
+            details: error instanceof Error ? error.message : "Unknown error",
+            stack: process.env.NODE_ENV === 'development' ? (error instanceof Error ? error.stack : undefined) : undefined
+          })
       }
     }
   )
@@ -159,7 +166,7 @@ export async function featuresRoutes(fastify: FastifyInstance) {
             "projectId",
             name,
             CASE 
-              WHEN geometry IS NOT NULL THEN ST_AsGeoJSON(geometry)::jsonb
+              WHEN geometry IS NOT NULL THEN ST_AsGeoJSON(geometry)
               ELSE NULL
             END as geometry,
             details,
@@ -183,7 +190,7 @@ export async function featuresRoutes(fastify: FastifyInstance) {
             "projectId",
             name,
             CASE 
-              WHEN geometry IS NOT NULL THEN ST_AsGeoJSON(geometry)::jsonb
+              WHEN geometry IS NOT NULL THEN ST_AsGeoJSON(geometry)
               ELSE NULL
             END as geometry,
             details,
@@ -204,7 +211,7 @@ export async function featuresRoutes(fastify: FastifyInstance) {
               "projectId",
               name,
               CASE 
-                WHEN geometry IS NOT NULL THEN ST_AsGeoJSON(geometry)::jsonb
+                WHEN geometry IS NOT NULL THEN ST_AsGeoJSON(geometry)
                 ELSE NULL
               END as geometry,
               details,

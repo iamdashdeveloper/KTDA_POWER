@@ -32,6 +32,8 @@ import { LandCoverLegend } from "../../panels/LandCoverLegend"
 import { TbGraph } from "react-icons/tb"
 import { ZonalStatisticsModal } from "../../modals/ZonalStatisticsModal"
 
+import { GeoprocessingPanel } from "../../../geoprocessing/GeoprocessingPanel"
+
 interface AnalysisToolbarProps {
   onToolClick: (toolId: string) => void
 }
@@ -117,7 +119,7 @@ export const AnalysisToolbar: React.FC<AnalysisToolbarProps> = ({
         <RibbonButton
           icon={<Cpu size={24} />}
           label="Geoprocessing"
-          onClick={() => onToolClick("geoprocessing")}
+          onClick={() => openPanel("right", <GeoprocessingPanel />, "Geoprocessing Toolbox")}
         />
         <RibbonButton
           icon={<Target size={24} />}

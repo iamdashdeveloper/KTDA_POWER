@@ -39,6 +39,7 @@ import { ZoomBoxLogic } from "./ribbon/tools/navigation/ZoomBoxLogic"
 import { MeasureLogic } from "./ribbon/tools/inquiry/MeasureLogic"
 import { GenerateChainnageLogic } from "./ribbon/tools/inquiry/GenerateChainnageLogic"
 import { DrawingLogic } from "./ribbon/tools/drawing/DrawingLogic"
+import { AnalysisLogic } from "./map-logic/AnalysisLogic"
 
 import { useLayout } from "@/context/LayoutContext"
 import { IdentifyPanel } from "./panels/IdentifyPanel"
@@ -687,6 +688,7 @@ export const OpenLayersMap: React.FC = () => {
             activeTool={activeTool}
           />
           <DrawingLogic map={mapInstanceRef.current} activeTool={activeTool} />
+          <AnalysisLogic map={mapInstanceRef.current} />
         </>
       )}
     </div>
