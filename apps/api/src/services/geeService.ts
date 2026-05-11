@@ -11,6 +11,35 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 // ─────────────────────────────────────────────────────────────────────────────
+// Utils
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Aggressively cleans GeoJSON coordinates for Google Earth Engine.
+ * GEE only accepts [lon, lat]. This strips any Z (altitude) values.
+ */
+function cleanGeometry(geom: any): any {
+  if (!geom) return null;
+  
+  const cleanCoords = (coords: any): any => {
+    if (Array.isArray(coords)) {
+      // If it's a coordinate pair/triplet [x, y, (z)]
+      if (typeof coords[0] === 'number') {
+        return [coords[0], coords[1]]; // Return only [lon, lat]
+      }
+      // If it's an array of arrays, recurse
+      return coords.map(cleanCoords);
+    }
+    return coords;
+  };
+
+  return {
+    ...geom,
+    coordinates: cleanCoords(geom.coordinates)
+  };
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Types
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -256,7 +285,8 @@ export async function getCopernicusTileUrl(
 export async function getWorldCoverStats(params: LandCoverStatsParams) {
   await initializeGEE();
 
-  const { geometry, year = 2021 } = params;
+  const { geometry: rawGeometry, year = 2021 } = params;
+  const geometry = cleanGeometry(rawGeometry);
 
   const image = getWorldCoverImage(year);
   const eeGeometry = ee.Geometry(geometry);
