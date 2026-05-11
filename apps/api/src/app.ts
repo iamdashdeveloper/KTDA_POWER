@@ -46,7 +46,19 @@ export async function createApp() {
     pluginTimeout: 30000, // Increase to 30s to allow for DB cold starts
   })
 
-  const allowedOrigins = env.CORS_ORIGIN ? env.CORS_ORIGIN.split(",") : [true]
+  const allowedOrigins = env.CORS_ORIGIN 
+    ? env.CORS_ORIGIN.split(",").map(origin => {
+        const trimmed = origin.trim()
+        if (trimmed.includes("*")) {
+          // Convert wildcard string to Regex: https://*.onrender.com -> /^https:\/\/.*\.onrender\.com$/
+          const regexStr = trimmed
+            .replace(/\./g, "\\.")
+            .replace(/\*/g, ".*")
+          return new RegExp(`^${regexStr}$`)
+        }
+        return trimmed
+      }) 
+    : [true]
 
   await fastify.register(cors, {
     origin: allowedOrigins,
