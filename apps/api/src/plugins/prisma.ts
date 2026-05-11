@@ -9,8 +9,9 @@ export default fp(async (fastify) => {
   const pool = new Pool({
     connectionString: process.env.DATABASE_URL,
     max: 10, // Limit connections in dev
-    idleTimeoutMillis: 30000, // Close idle connections after 30s
-    connectionTimeoutMillis: 5000, // Return error if connection takes > 5s
+    idleTimeoutMillis: 120000, // Keep connections alive for 2 mins
+    connectionTimeoutMillis: 15000, // Allow 15s for Neon cold starts
+    statement_timeout: 30000, // Kill queries that take > 30s
   })
 
   // Handle pool errors to prevent process crashes

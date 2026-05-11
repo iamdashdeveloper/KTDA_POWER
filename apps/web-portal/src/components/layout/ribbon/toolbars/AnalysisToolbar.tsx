@@ -27,7 +27,10 @@ import { CreateHydroModelModal } from "../../../modals/CreateHydroModelModal"
 import { LoadHydroModelModal } from "../../../modals/LoadHydroModelModal"
 import { ApiClient } from "@/lib/api"
 import { useLayout } from "@/context/LayoutContext"
+import { useProjectStore } from "@/store/useProjectStore"
 import { LandCoverLegend } from "../../panels/LandCoverLegend"
+import { TbGraph } from "react-icons/tb"
+import { ZonalStatisticsModal } from "../../modals/ZonalStatisticsModal"
 
 interface AnalysisToolbarProps {
   onToolClick: (toolId: string) => void
@@ -39,8 +42,10 @@ export const AnalysisToolbar: React.FC<AnalysisToolbarProps> = ({
   const { viewMode, setViewMode, executeTerrainCommand, setLandCoverTileUrl, setLayerVisibility } = useMapStore()
   const { openPanel } = useLayout()
   const { addTab } = useHydroModelStore()
+  const { activeProject } = useProjectStore()
   const [isCreateHydroModelOpen, setIsCreateHydroModelOpen] = useState(false)
   const [isLoadHydroModelOpen, setIsLoadHydroModelOpen] = useState(false)
+  const [isZonalStatsOpen, setIsZonalStatsOpen] = useState(false)
   const [isLoadingLandCover, setIsLoadingLandCover] = useState(false)
 
   const is3D = viewMode === "TERRAIN_3D"
@@ -198,12 +203,9 @@ export const AnalysisToolbar: React.FC<AnalysisToolbarProps> = ({
     }}
           />
           <RibbonSmallButton
-            icon={<Box size={14} />}
-            label="Load Model"
-            onClick={() => {
-              console.log("[AnalysisToolbar] Load Model clicked")
-              setIsLoadHydroModelOpen(true)
-            }}
+            icon={<TbGraph size={14} />}
+            label="Zonal Statistics"
+            onClick={() => setIsZonalStatsOpen(true)}
           />
         </div>
       </RibbonGroup>
@@ -236,6 +238,12 @@ export const AnalysisToolbar: React.FC<AnalysisToolbarProps> = ({
           })
           addTab(modelId, modelName)
         }}
+      />
+
+      <ZonalStatisticsModal
+        isOpen={isZonalStatsOpen}
+        onClose={() => setIsZonalStatsOpen(false)}
+        projectId={activeProject?.id}
       />
     </div>
   )

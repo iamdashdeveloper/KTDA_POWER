@@ -43,10 +43,13 @@ export async function createApp() {
   const fastify = Fastify({
     logger: env.NODE_ENV === "development",
     bodyLimit: 52428800,
+    pluginTimeout: 30000, // Increase to 30s to allow for DB cold starts
   })
 
+  const allowedOrigins = env.CORS_ORIGIN ? env.CORS_ORIGIN.split(",") : [true]
+
   await fastify.register(cors, {
-    origin: true,
+    origin: allowedOrigins,
     methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     credentials: true,
     allowedHeaders: ["Content-Type", "Authorization", "Accept", "X-Requested-With"],
