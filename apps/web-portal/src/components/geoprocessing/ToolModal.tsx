@@ -68,6 +68,11 @@ export const ToolModal: React.FC<ToolModalProps> = ({ toolId, onClose }) => {
         const distance = bufferUnits === "meters" ? bufferDistance / 1000 : bufferDistance
         const buffered = turf.buffer(layer.geometry as any, distance, { units: "kilometers" })
         
+        if (!buffered) {
+          toast.error("Failed to create buffer")
+          return
+        }
+
         addAnalysisLayer({
           name: `Buffer of ${layer.name} (${bufferDistance}${bufferUnits === "meters" ? "m" : "km"})`,
           type: "Buffer",
@@ -78,10 +83,15 @@ export const ToolModal: React.FC<ToolModalProps> = ({ toolId, onClose }) => {
       } else if (toolId === "simplify") {
         const simplified = turf.simplify(layer.geometry as any, { tolerance: simplifyTolerance, highQuality: true })
         
+        if (!simplified) {
+          toast.error("Failed to simplify geometry")
+          return
+        }
+
         addAnalysisLayer({
           name: `Simplified ${layer.name} (tol: ${simplifyTolerance})`,
           type: "Simplify",
-          geometry: simplified,
+          geometry: simplified.geometry || (simplified as any),
           color: "#f59e0b"
         })
         toast.success("Geometry simplification complete")
@@ -112,7 +122,7 @@ export const ToolModal: React.FC<ToolModalProps> = ({ toolId, onClose }) => {
           ]))
         }
 
-        if (!result) {
+        if (!result || !result.geometry) {
           toast.warning("No intersection found between selected features")
         } else {
           addAnalysisLayer({
