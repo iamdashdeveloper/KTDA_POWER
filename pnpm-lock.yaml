@@ -384,6 +384,9 @@ importers:
       ol:
         specifier: ^10.8.0
         version: 10.8.0
+      ol-cesium:
+        specifier: ^2.17.0
+        version: 2.17.0(cesium@1.140.0)(ol@10.8.0)
       react:
         specifier: 19.2.4
         version: 19.2.4
@@ -5378,6 +5381,12 @@ packages:
 
   ohash@2.0.11:
     resolution: {integrity: sha512-RdR9FQrFwNBNXAr4GixM8YaRZRJ5PUWbKYbE5eOsrwAjJW0q2REGcf79oYPsLyskQCZG1PLN+S/K1V00joZAoQ==}
+
+  ol-cesium@2.17.0:
+    resolution: {integrity: sha512-XaMXjQYuq2eMPAgAx2e1wjN4I4QwfmPC+9YgU4xoMCj/MBj8oDQusyloQ4TaovypqbZg+0jJDDSZc7BhXckBwA==}
+    peerDependencies:
+      cesium: '>= 1.62.0'
+      ol: '>= 6.0.1 || 7 || 8'
 
   ol@10.8.0:
     resolution: {integrity: sha512-kLk7jIlJvKyhVMAjORTXKjzlM6YIByZ1H/d0DBx3oq8nSPCG6/gbLr5RxukzPgwbhnAqh+xHNCmrvmFKhVMvoQ==}
@@ -12786,6 +12795,11 @@ snapshots:
   obliterator@2.0.5: {}
 
   ohash@2.0.11: {}
+
+  ol-cesium@2.17.0(cesium@1.140.0)(ol@10.8.0):
+    dependencies:
+      cesium: 1.140.0
+      ol: 10.8.0
 
   ol@10.8.0:
     dependencies:

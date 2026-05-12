@@ -14,28 +14,38 @@ export async function parseSpatialFile(
   const fileType = filename.toLowerCase().split(".").pop()
 
   try {
-    let geojsonData: GeoJSON
+    let geojsonData: any
+    const content = fileBuffer.toString("utf-8").trim()
 
-    if (fileType === "geojson" || fileType === "json") {
-      geojsonData = JSON.parse(fileBuffer.toString("utf-8"))
-    } else if (fileType === "kml" || fileType === "kmz") {
-      const kmlContent =
-        fileType === "kmz"
-          ? await extractKmlFromKmz(fileBuffer)
-          : fileBuffer.toString("utf-8")
+    // Smart detection: if it looks like JSON, try parsing it as JSON first
+    // even if the extension says KML (common user error)
+    if (content.startsWith("{") || fileType === "geojson" || fileType === "json") {
+      try {
+        geojsonData = JSON.parse(content)
+      } catch (jsonErr) {
+        // If extension was geojson/json, we should rethrow
+        if (fileType === "geojson" || fileType === "json") throw jsonErr
+        // Otherwise, fall through to KML/GPX parsing
+      }
+    }
 
-      const parser = new DOMParser()
-      const doc = parser.parseFromString(kmlContent, "text/xml")
-      geojsonData = kml(doc) as any
-    } else if (fileType === "gpx") {
-      const parser = new DOMParser()
-      const doc = parser.parseFromString(
-        fileBuffer.toString("utf-8"),
-        "text/xml"
-      )
-      geojsonData = gpx(doc) as any
-    } else {
-      throw new Error(`Unsupported format: .${fileType}`)
+    if (!geojsonData) {
+      if (fileType === "kml" || fileType === "kmz") {
+        const kmlContent =
+          fileType === "kmz"
+            ? await extractKmlFromKmz(fileBuffer)
+            : content
+  
+        const parser = new DOMParser()
+        const doc = parser.parseFromString(kmlContent, "text/xml")
+        geojsonData = kml(doc)
+      } else if (fileType === "gpx") {
+        const parser = new DOMParser()
+        const doc = parser.parseFromString(content, "text/xml")
+        geojsonData = gpx(doc)
+      } else {
+        throw new Error(`Unsupported format: .${fileType}`)
+      }
     }
 
     return extractFeatures(geojsonData)
@@ -55,29 +65,63 @@ async function extractKmlFromKmz(buffer: Buffer): Promise<string> {
   return kmlFile.async("text")
 }
 
-function extractFeatures(geojson: GeoJSON): any[] {
+function extractFeatures(geojson: any): any[] {
+  if (!geojson) return []
+
+  // Case 1: Standard FeatureCollection
   if (geojson.type === "FeatureCollection") {
-    return geojson.features.map(convertFeature)
-  } else if (geojson.type === "Feature") {
-    return [convertFeature(geojson)]
+    return (geojson.features || []).map(convertFeature).filter(Boolean)
   }
-  // Handle raw geometries
-  return [
-    {
-      type: "Feature",
-      name: "Feature",
-      properties: {},
-      geometry: geojson,
-    },
-  ]
+
+  // Case 2: Single Feature
+  if (geojson.type === "Feature") {
+    return [convertFeature(geojson)].filter(Boolean)
+  }
+
+  // Case 3: Array of features (non-standard but common)
+  if (Array.isArray(geojson)) {
+    return geojson.map(item => {
+        if (item.type === "Feature") return convertFeature(item);
+        if (item.type) return convertFeature({ type: "Feature", geometry: item, properties: {} } as any);
+        return null;
+    }).filter(Boolean)
+  }
+
+  // Case 4: GeometryCollection
+  if (geojson.type === "GeometryCollection" && Array.isArray(geojson.geometries)) {
+    return geojson.geometries.map((geom: any) => 
+      convertFeature({ type: "Feature", geometry: geom, properties: {} } as any)
+    ).filter(Boolean)
+  }
+
+  // Case 5: Direct Geometries (Point, Polygon, etc.)
+  if (geojson.type && [
+    "Point", "LineString", "Polygon", 
+    "MultiPoint", "MultiLineString", "MultiPolygon"
+  ].includes(geojson.type)) {
+    return [convertFeature({ type: "Feature", geometry: geojson, properties: {} } as any)]
+  }
+
+  // Case 6: Fallback for objects that might have features property
+  if (geojson.features && Array.isArray(geojson.features)) {
+    return geojson.features.map(convertFeature).filter(Boolean)
+  }
+
+  return []
 }
 
-function convertFeature(feature: Feature): any {
+function convertFeature(feature: any): any {
+  if (!feature) return null;
+  
   const props = feature.properties || {}
+  const geometry = feature.geometry || (feature.type !== "Feature" ? feature : null);
+  
+  if (!geometry || !geometry.type) return null;
+
   return {
     type: "Feature",
-    name: props.name || props.Name || (feature as any).id || "Unnamed Feature",
+    name: props.name || props.Name || props.label || feature.id || "Unnamed Feature",
     properties: props,
-    geometry: feature.geometry,
+    geometry: geometry,
   }
 }

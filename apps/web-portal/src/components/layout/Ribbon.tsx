@@ -50,6 +50,7 @@ export const Ribbon: React.FC<RibbonProps> = ({ onToolAction }) => {
     projectFeatures,
     scratchFeatures,
     setWeatherPanelOpen,
+    set3DSyncActive,
   } = useMapStore()
   const [isAddLayerOpen, setIsAddLayerOpen] = useState(false)
   const [isGenerateChainnageOpen, setIsGenerateChainnageOpen] = useState(false)
@@ -158,9 +159,11 @@ export const Ribbon: React.FC<RibbonProps> = ({ onToolAction }) => {
         )
         break
       case "open-weather-station":
-        // Open weather panel in center and collapse right panel
         setWeatherPanelOpen(true)
         setCollapsed("right", true)
+        break
+      case "sync-3d":
+        set3DSyncActive(true)
         break
       default:
         break

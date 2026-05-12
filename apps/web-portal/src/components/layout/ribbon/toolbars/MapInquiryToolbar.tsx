@@ -9,7 +9,7 @@ import {
 } from "lucide-react"
 import { RibbonGroup } from "../RibbonGroup"
 import { RibbonButton } from "../RibbonButton"
-
+import { SiOpen3D } from "react-icons/si";
 interface MapInquiryToolbarProps {
   activeTool: string | null
   onToolClick: (toolId: string) => void
@@ -58,6 +58,11 @@ export const MapInquiryToolbar: React.FC<MapInquiryToolbarProps> = ({
             icon={<LineChartIcon size={14} />}
             label="Generate chainage markers"
             onClick={() => onToolClick("generate-chainage")}
+          />
+          <RibbonSmallButton
+            icon={<SiOpen3D size={14} />}
+            label="Sync 3D"
+            onClick={() => onToolClick("sync-3d")}
           />
         </div>
       </div>

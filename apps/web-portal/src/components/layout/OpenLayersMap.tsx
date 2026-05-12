@@ -49,6 +49,9 @@ import { ApiClient } from "@/lib/api"
 
 const geoJsonFormat = new GeoJSON()
 
+let latestMapInstance: Map | null = null
+export const getMapInstance = () => latestMapInstance
+
 export const OpenLayersMap: React.FC = () => {
   const mapRef = React.useRef<HTMLDivElement>(null)
 
@@ -157,12 +160,15 @@ export const OpenLayersMap: React.FC = () => {
       style: featureStyleFunction,
       zIndex: 10,
     })
+    features.set('altitudeMode', 'clampToGround')
+
     const issuesSource = new VectorSource()
     const issues = new VectorLayer({
       source: issuesSource,
       style: issueStyleFunction,
       zIndex: 20,
     })
+    issues.set('altitudeMode', 'clampToGround')
     const animation = new TileLayer({
       source: new XYZ({ url: "", crossOrigin: "anonymous" }),
       visible: false,
@@ -249,6 +255,7 @@ export const OpenLayersMap: React.FC = () => {
       }
     })
 
+    latestMapInstance = map
     mapInstanceRef.current = map
     setMapInstance(map)
     setResolution(map.getView().getResolution() || 0)

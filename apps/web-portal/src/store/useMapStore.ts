@@ -95,6 +95,9 @@ interface MapStore {
     speed: "slow" | "medium" | "fast"
   }
   setAnimationConfig: (config: Partial<MapStore["animationConfig"]>) => void
+  // 3D Sync
+  is3DSyncActive: boolean
+  set3DSyncActive: (active: boolean) => void
 }
 
 export const useMapStore = create<MapStore>((set) => ({
@@ -238,4 +241,6 @@ export const useMapStore = create<MapStore>((set) => ({
     set((state) => ({
       animationConfig: { ...state.animationConfig, ...config },
     })),
+  is3DSyncActive: false,
+  set3DSyncActive: (active) => set({ is3DSyncActive: active }),
 }))
