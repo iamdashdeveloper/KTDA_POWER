@@ -1,4 +1,3 @@
-// @ts-expect-error - ol-cesium doesn't have type definitions
 import OLCesium from "ol-cesium"
 import Map from "ol/Map"
 import * as Cesium from "cesium"
@@ -46,8 +45,7 @@ export class CesiumSyncManager {
 
     // Enable sync — this starts the Cesium render loop and camera sync
     this.olcs
-      .setEnabled(true)
-      (
+      .setEnabled(true)(
         // Enable auto render loop as per ol-cesium examples
         this.olcs as any
       )
