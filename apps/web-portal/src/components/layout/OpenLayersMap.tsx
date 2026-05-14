@@ -290,8 +290,17 @@ export const OpenLayersMap: React.FC = () => {
         }
       )
 
-      if (!result) return
+      if (!result) {
+        // Clear selection if clicking on empty space in select mode
+        if (toolRef.current === "select") {
+          const { setSelectedLayer } = useGeoprocessingStore.getState()
+          setSelectedLayer(null)
+        }
+        return
+      }
+
       const { feature, layer } = result
+
       const properties = (feature as Feature).getProperties()
 
       // Determine if it's an issue based on the layer
