@@ -1,13 +1,13 @@
-import React, { useState } from 'react';
-import { useMapStore, type ProjectFeature } from '@/store/useMapStore';
-import { LayerItem } from './LayerItem';
-import { useLayout } from '@/context/LayoutContext';
-import { useAttributeTableStore } from '@/store/useAttributeTableStore';
-import { ContextMenu, type ContextMenuItem } from '@/components/ui/ContextMenu';
-import { useProjectStore } from '@/store/useProjectStore';
-import { Table, ZoomIn, Trash2, Link, Link2Off } from 'lucide-react';
-import { ApiClient } from '@/lib/api';
-import { toast } from 'sonner';
+import React, { useState } from "react"
+import { useMapStore, type ProjectFeature } from "@/store/useMapStore"
+import { LayerItem } from "./LayerItem"
+import { useLayout } from "@/context/LayoutContext"
+import { useAttributeTableStore } from "@/store/useAttributeTableStore"
+import { ContextMenu, type ContextMenuItem } from "@/components/ui/ContextMenu"
+import { useProjectStore } from "@/store/useProjectStore"
+import { Table, ZoomIn, Trash2, Link, Link2Off } from "lucide-react"
+import { ApiClient } from "@/lib/api"
+import { toast } from "sonner"
 import {
   AlertDialog,
   AlertDialogAction,
@@ -17,105 +17,148 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-} from "@workspace/ui/components/alert-dialog";
+} from "@workspace/ui/components/alert-dialog"
 
 export const ContentsTab: React.FC = () => {
-  const { setCollapsed } = useLayout();
-  const { addTable } = useAttributeTableStore();
-  const { 
-    layers, toggleLayer, 
-    projectFeatures, scratchFeatures, 
-    hiddenFeatureIds, triggerRefresh,
-    executeCommand
-  } = useMapStore();
-  const { activeProject } = useProjectStore();
-  
-  const [contextMenu, setContextMenu] = useState<{ 
-    x: number, y: number, 
-    layerId: string, layerName: string,
-    type: 'project' | 'scratch' | 'system'
-  } | null>(null);
+  const { setCollapsed } = useLayout()
+  const { addTable } = useAttributeTableStore()
+  const {
+    layers,
+    toggleLayer,
+    projectFeatures,
+    scratchFeatures,
+    hiddenFeatureIds,
+    triggerRefresh,
+    executeCommand,
+  } = useMapStore()
+  const { activeProject } = useProjectStore()
+
+  const [contextMenu, setContextMenu] = useState<{
+    x: number
+    y: number
+    layerId: string
+    layerName: string
+    type: "project" | "scratch" | "system" | "feature"
+  } | null>(null)
+
+  const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set())
+
+  const toggleGroupExpansion = (groupName: string) => {
+    const next = new Set(expandedGroups)
+    if (next.has(groupName)) next.delete(groupName)
+    else next.add(groupName)
+    setExpandedGroups(next)
+  }
 
   const [alertConfig, setAlertConfig] = useState<{
-    open: boolean;
-    title: string;
-    description: string;
-    onConfirm: () => void;
-    variant?: 'danger' | 'default';
+    open: boolean
+    title: string
+    description: string
+    onConfirm: () => void
+    variant?: "danger" | "default"
   }>({
     open: false,
     title: "",
     description: "",
     onConfirm: () => {},
-  });
+  })
 
-  const baseLayers = layers.filter(l => l.type === 'base');
-  const overlayLayers = layers.filter(l => l.type !== 'base' && l.type !== 'reference' && l.id !== 'project-features');
-  const projectLayer = layers.find(l => l.id === 'project-features');
-  const referenceLayers = layers.filter(l => l.type === 'reference');
+  const baseLayers = layers.filter((l) => l.type === "base")
+  const overlayLayers = layers.filter(
+    (l) =>
+      l.type !== "base" && l.type !== "reference" && l.id !== "project-features"
+  )
+  const projectLayer = layers.find((l) => l.id === "project-features")
+  const referenceLayers = layers.filter((l) => l.type === "reference")
 
   // Group features by groupName
-  const projectGroups: Record<string, ProjectFeature[]> = {};
-  projectFeatures.forEach(f => {
-    const groupName = f.groupName || 'Other Features';
-    if (!projectGroups[groupName]) projectGroups[groupName] = [];
-    projectGroups[groupName].push(f);
-  });
+  const projectGroups: Record<string, ProjectFeature[]> = {}
+  projectFeatures.forEach((f) => {
+    const groupName = f.groupName || "Other Features"
+    if (!projectGroups[groupName]) projectGroups[groupName] = []
+    projectGroups[groupName].push(f)
+  })
 
-  const scratchGroups: Record<string, ProjectFeature[]> = {};
-  scratchFeatures.forEach(f => {
-    const groupName = f.groupName || 'Scratch Layer';
-    if (!scratchGroups[groupName]) scratchGroups[groupName] = [];
-    scratchGroups[groupName].push(f);
-  });
+  const scratchGroups: Record<string, ProjectFeature[]> = {}
+  scratchFeatures.forEach((f) => {
+    const groupName = f.groupName || "Scratch Layer"
+    if (!scratchGroups[groupName]) scratchGroups[groupName] = []
+    scratchGroups[groupName].push(f)
+  })
 
-  const handleContextMenu = (e: React.MouseEvent, layerId: string, layerName: string, type: 'project' | 'scratch' | 'system' = 'system') => {
-    e.preventDefault();
-    setContextMenu({ x: e.clientX, y: e.clientY, layerId, layerName, type });
-  };
+  const handleContextMenu = (
+    e: React.MouseEvent,
+    layerId: string,
+    layerName: string,
+    type: "project" | "scratch" | "system" | "feature" = "system"
+  ) => {
+    e.preventDefault()
+    e.stopPropagation()
+    setContextMenu({ x: e.clientX, y: e.clientY, layerId, layerName, type })
+  }
 
   const openAttributeTable = (id: string, name: string) => {
-    addTable(id, name);
-    setCollapsed('bottom', false);
-  };
+    addTable(id, name)
+    setCollapsed("bottom", false)
+  }
 
   const getTargetId = (layerName: string, features: ProjectFeature[]) => {
-    const groupFeatures = features.filter(f => (f.groupName || 'Other Features') === layerName || (f.groupName || 'Scratch Layer') === layerName);
-    return groupFeatures[0]?.groupId || (groupFeatures.length === 1 ? groupFeatures[0].id : null);
-  };
+    const groupFeatures = features.filter(
+      (f) =>
+        (f.groupName || "Other Features") === layerName ||
+        (f.groupName || "Scratch Layer") === layerName
+    )
+    return (
+      groupFeatures[0]?.groupId ||
+      (groupFeatures.length === 1 ? groupFeatures[0].id : null)
+    )
+  }
 
-  const handleDeletePermanently = async (layerName: string, features: ProjectFeature[]) => {
-    const targetId = getTargetId(layerName, features);
+  const handleDeletePermanently = async (
+    layerId: string,
+    layerName: string,
+    type: "project" | "scratch" | "feature"
+  ) => {
+    let targetId: string | null = null
+    if (type === "feature") {
+      targetId = layerId
+    } else {
+      const features = type === "project" ? projectFeatures : scratchFeatures
+      targetId = getTargetId(layerName, features)
+    }
+
     if (!targetId) {
-      toast.error("Could not find a valid ID to delete.");
-      return;
+      toast.error("Could not find a valid ID to delete.")
+      return
     }
 
     setAlertConfig({
       open: true,
       title: "Permanently delete layer?",
       description: `This will completely remove "${layerName}" from the database. This action cannot be undone.`,
-      variant: 'danger',
+      variant: "danger",
       onConfirm: async () => {
         try {
-          await ApiClient.delete(`/features/${targetId}`);
-          
-          const scratchIds = JSON.parse(localStorage.getItem('scratch_layers') || '[]');
-          const filtered = scratchIds.filter((id: string) => id !== targetId);
-          localStorage.setItem('scratch_layers', JSON.stringify(filtered));
+          await ApiClient.delete(`/features/${targetId}`)
 
-          toast.success(`"${layerName}" deleted permanently`);
-          triggerRefresh();
+          const scratchIds = JSON.parse(
+            localStorage.getItem("scratch_layers") || "[]"
+          )
+          const filtered = scratchIds.filter((id: string) => id !== targetId)
+          localStorage.setItem("scratch_layers", JSON.stringify(filtered))
+
+          toast.success(`"${layerName}" deleted permanently`)
+          triggerRefresh()
         } catch (error: any) {
-          toast.error(error.message || "Failed to delete layer");
+          toast.error(error.message || "Failed to delete layer")
         }
-      }
-    });
-  };
+      },
+    })
+  }
 
   const handleDetachFromProject = async (layerName: string) => {
-    const targetId = getTargetId(layerName, projectFeatures);
-    if (!targetId) return;
+    const targetId = getTargetId(layerName, projectFeatures)
+    if (!targetId) return
 
     setAlertConfig({
       open: true,
@@ -123,46 +166,52 @@ export const ContentsTab: React.FC = () => {
       description: `"${layerName}" will be moved to Independent Layers and won't be tied to this project anymore.`,
       onConfirm: async () => {
         try {
-          await ApiClient.put(`/features/${targetId}`, { projectId: null });
-          
-          const scratchIds = JSON.parse(localStorage.getItem('scratch_layers') || '[]');
+          await ApiClient.put(`/features/${targetId}`, { projectId: null })
+
+          const scratchIds = JSON.parse(
+            localStorage.getItem("scratch_layers") || "[]"
+          )
           if (!scratchIds.includes(targetId)) {
-            scratchIds.push(targetId);
-            localStorage.setItem('scratch_layers', JSON.stringify(scratchIds));
+            scratchIds.push(targetId)
+            localStorage.setItem("scratch_layers", JSON.stringify(scratchIds))
           }
 
-          toast.success(`"${layerName}" moved to Independent Layers`);
-          triggerRefresh();
+          toast.success(`"${layerName}" moved to Independent Layers`)
+          triggerRefresh()
         } catch (error: any) {
-          toast.error("Failed to detach from project");
+          toast.error("Failed to detach from project")
         }
-      }
-    });
-  };
+      },
+    })
+  }
 
   const handleAttachToProject = async (layerName: string) => {
     if (!activeProject) {
-      toast.error("Select a project first");
-      return;
+      toast.error("Select a project first")
+      return
     }
 
-    const targetId = getTargetId(layerName, scratchFeatures);
-    if (!targetId) return;
+    const targetId = getTargetId(layerName, scratchFeatures)
+    if (!targetId) return
 
     try {
-      await ApiClient.put(`/features/${targetId}`, { projectId: activeProject.id });
-      
-      // Remove from local scratch list
-      const scratchIds = JSON.parse(localStorage.getItem('scratch_layers') || '[]');
-      const filtered = scratchIds.filter((id: string) => id !== targetId);
-      localStorage.setItem('scratch_layers', JSON.stringify(filtered));
+      await ApiClient.put(`/features/${targetId}`, {
+        projectId: activeProject.id,
+      })
 
-      toast.success(`"${layerName}" associated with ${activeProject.name}`);
-      triggerRefresh();
+      // Remove from local scratch list
+      const scratchIds = JSON.parse(
+        localStorage.getItem("scratch_layers") || "[]"
+      )
+      const filtered = scratchIds.filter((id: string) => id !== targetId)
+      localStorage.setItem("scratch_layers", JSON.stringify(filtered))
+
+      toast.success(`"${layerName}" associated with ${activeProject.name}`)
+      triggerRefresh()
     } catch (error: any) {
-      toast.error("Failed to attach to project");
+      toast.error("Failed to attach to project")
     }
-  };
+  }
 
   const handleRemoveSystemLayer = (layerId: string, layerName: string) => {
     setAlertConfig({
@@ -170,168 +219,365 @@ export const ContentsTab: React.FC = () => {
       title: "Remove from view?",
       description: `Remove "${layerName}" from the map contents? You can add it back from the Catalog.`,
       onConfirm: () => {
-        const { removeLayer } = useMapStore.getState();
-        removeLayer(layerId);
-      }
-    });
-  };
+        const { removeLayer } = useMapStore.getState()
+        removeLayer(layerId)
+      },
+    })
+  }
+
+  const handleRemoveFromView = (
+    layerId: string,
+    layerName: string,
+    type: "project" | "scratch" | "feature"
+  ) => {
+    const {
+      removeProjectFeature,
+      removeProjectFeatureGroup,
+      removeScratchFeature,
+      removeScratchFeatureGroup,
+    } = useMapStore.getState()
+
+    if (type === "project") {
+      removeProjectFeatureGroup(layerName)
+      toast.success(`"${layerName}" removed from view`)
+    } else if (type === "scratch") {
+      removeScratchFeatureGroup(layerName)
+      toast.success(`"${layerName}" removed from view`)
+    } else if (type === "feature") {
+      removeProjectFeature(layerId)
+      removeScratchFeature(layerId)
+      toast.success(`Feature removed from view`)
+    }
+  }
 
   const getContextMenuItems = () => {
-    if (!contextMenu) return [];
+    if (!contextMenu) return []
 
     const items: ContextMenuItem[] = [
-      { 
-        label: 'Zoom to Layer', 
-        icon: <ZoomIn size={12} />, 
-        onClick: () => executeCommand('zoom-to-layer', { 
-          id: contextMenu.layerId, 
-          name: contextMenu.layerName,
-          type: contextMenu.type
-        }) 
+      {
+        label: "Zoom to Layer",
+        icon: <ZoomIn size={12} />,
+        onClick: () =>
+          executeCommand("zoom-to-layer", {
+            id: contextMenu.layerId,
+            name: contextMenu.layerName,
+            type: contextMenu.type,
+          }),
       },
-      { label: 'Attribute Table', icon: <Table size={12} />, onClick: () => openAttributeTable(contextMenu.layerId, contextMenu.layerName) },
-    ];
+      {
+        label: "Attribute Table",
+        icon: <Table size={12} />,
+        onClick: () =>
+          openAttributeTable(contextMenu.layerId, contextMenu.layerName),
+      },
+    ]
 
-    if (contextMenu.type === 'project') {
+    if (contextMenu.type === "project") {
       items.push(
-        { label: 'Detach from Project', icon: <Link2Off size={12} />, onClick: () => handleDetachFromProject(contextMenu.layerName) },
-        { label: 'Delete Permanently', icon: <Trash2 size={12} />, variant: 'danger', onClick: () => handleDeletePermanently(contextMenu.layerName, projectFeatures) }
-      );
-    } else if (contextMenu.type === 'scratch') {
+        {
+          label: "Detach from Project",
+          icon: <Link2Off size={12} />,
+          onClick: () => handleDetachFromProject(contextMenu.layerName),
+        },
+        {
+          label: "Remove from View",
+          icon: <Trash2 size={12} />,
+          onClick: () =>
+            handleRemoveFromView(
+              contextMenu.layerId,
+              contextMenu.layerName,
+              "project"
+            ),
+        },
+        {
+          label: "Delete Permanently",
+          icon: <Trash2 size={12} />,
+          variant: "danger",
+          onClick: () =>
+            handleDeletePermanently(
+              contextMenu.layerId,
+              contextMenu.layerName,
+              "project"
+            ),
+        }
+      )
+    } else if (contextMenu.type === "scratch") {
       items.push(
-        { label: 'Associate with Project', icon: <Link size={12} />, onClick: () => handleAttachToProject(contextMenu.layerName) },
-        { label: 'Delete Permanently', icon: <Trash2 size={12} />, variant: 'danger', onClick: () => handleDeletePermanently(contextMenu.layerName, scratchFeatures) }
-      );
+        {
+          label: "Associate with Project",
+          icon: <Link size={12} />,
+          onClick: () => handleAttachToProject(contextMenu.layerName),
+        },
+        {
+          label: "Remove from View",
+          icon: <Trash2 size={12} />,
+          onClick: () =>
+            handleRemoveFromView(
+              contextMenu.layerId,
+              contextMenu.layerName,
+              "scratch"
+            ),
+        },
+        {
+          label: "Delete Permanently",
+          icon: <Trash2 size={12} />,
+          variant: "danger",
+          onClick: () =>
+            handleDeletePermanently(
+              contextMenu.layerId,
+              contextMenu.layerName,
+              "scratch"
+            ),
+        }
+      )
+    } else if (contextMenu.type === "feature") {
+      items.push(
+        {
+          label: "Remove from View",
+          icon: <Trash2 size={12} />,
+          onClick: () =>
+            handleRemoveFromView(
+              contextMenu.layerId,
+              contextMenu.layerName,
+              "feature"
+            ),
+        },
+        {
+          label: "Delete Permanently",
+          icon: <Trash2 size={12} />,
+          variant: "danger",
+          onClick: () =>
+            handleDeletePermanently(
+              contextMenu.layerId,
+              contextMenu.layerName,
+              "feature"
+            ),
+        }
+      )
     } else {
-      items.push(
-        { label: 'Remove from View', icon: <Trash2 size={12} />, variant: 'danger', onClick: () => handleRemoveSystemLayer(contextMenu.layerId, contextMenu.layerName) }
-      );
+      if (contextMenu.layerId !== "project-features") {
+        items.push({
+          label: "Remove from View",
+          icon: <Trash2 size={12} />,
+          variant: "danger",
+          onClick: () =>
+            handleRemoveSystemLayer(contextMenu.layerId, contextMenu.layerName),
+        })
+      }
     }
 
-    return items;
-  };
+    return items
+  }
 
   return (
-    <div className="flex flex-col gap-2 relative">
-       <AlertDialog 
-         open={alertConfig.open} 
-         onOpenChange={(open) => setAlertConfig(prev => ({ ...prev, open }))}
-       >
-         <AlertDialogContent>
-           <AlertDialogHeader>
-             <AlertDialogTitle>{alertConfig.title}</AlertDialogTitle>
-             <AlertDialogDescription>
-               {alertConfig.description}
-             </AlertDialogDescription>
-           </AlertDialogHeader>
-           <AlertDialogFooter>
-             <AlertDialogCancel>Cancel</AlertDialogCancel>
-             <AlertDialogAction 
-               onClick={alertConfig.onConfirm}
-               className={alertConfig.variant === 'danger' ? 'bg-destructive text-destructive-foreground hover:bg-destructive/90' : ''}
-             >
-               Continue
-             </AlertDialogAction>
-           </AlertDialogFooter>
-         </AlertDialogContent>
-       </AlertDialog>
+    <div className="relative flex flex-col gap-2">
+      <AlertDialog
+        open={alertConfig.open}
+        onOpenChange={(open) => setAlertConfig((prev) => ({ ...prev, open }))}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{alertConfig.title}</AlertDialogTitle>
+            <AlertDialogDescription>
+              {alertConfig.description}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={alertConfig.onConfirm}
+              className={
+                alertConfig.variant === "danger"
+                  ? "text-destructive-foreground bg-destructive hover:bg-destructive/90"
+                  : ""
+              }
+            >
+              Continue
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
-       {contextMenu && (
-         <ContextMenu 
-           x={contextMenu.x} 
-           y={contextMenu.y} 
-           onClose={() => setContextMenu(null)}
-           items={getContextMenuItems()}
-         />
-       )}
-       
-       <div className="flex flex-col gap-1">
-         <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest px-1 mb-1">Project Layers</span>
-         
-         {projectLayer && (
-           <LayerItem 
-             label={projectLayer.name} 
-             active={projectLayer.visible} 
-             onChange={() => toggleLayer(projectLayer.id)}
-             onContextMenu={(e) => handleContextMenu(e, projectLayer.id, projectLayer.name)}
-             expanded={projectLayer.visible && Object.keys(projectGroups).length > 0}
-           >
-             <div className="ml-4 flex flex-col gap-1 mt-1 border-l border-border/50 pl-2">
-               {Object.entries(projectGroups).map(([groupName, features]) => {
-                 const isGroupVisible = features.some(f => !hiddenFeatureIds.has(f.id));
-                 return (
-                   <LayerItem 
-                     key={groupName} 
-                     label={`${groupName}`} 
-                     active={isGroupVisible} 
-                     onChange={() => {
-                       const { toggleGroupVisibility } = useMapStore.getState();
-                       toggleGroupVisibility(groupName);
-                     }} 
-                     onContextMenu={(e) => handleContextMenu(e, `group-${groupName}`, groupName, 'project')}
-                   />
-                 );
-               })}
-             </div>
-           </LayerItem>
-         )}
+      {contextMenu && (
+        <ContextMenu
+          x={contextMenu.x}
+          y={contextMenu.y}
+          onClose={() => setContextMenu(null)}
+          items={getContextMenuItems()}
+        />
+      )}
 
-         {overlayLayers.map(layer => (
-           <LayerItem 
-             key={layer.id} 
-             label={layer.name} 
-             active={layer.visible} 
-             onChange={() => toggleLayer(layer.id)} 
-             onContextMenu={(e) => handleContextMenu(e, layer.id, layer.name)}
-           />
-         ))}
-       </div>
+      <div className="flex flex-col gap-1">
+        <span className="mb-1 px-1 text-[10px] font-bold tracking-widest text-muted-foreground uppercase">
+          Project Layers
+        </span>
 
-       {Object.keys(scratchGroups).length > 0 && (
-         <>
-           <div className="h-px bg-border/50 my-2" />
-           <div className="flex flex-col gap-1">
-             <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest px-1 mb-1">Independent Layers</span>
-             {Object.entries(scratchGroups).map(([groupName, features]) => {
-               const isGroupVisible = features.some(f => !hiddenFeatureIds.has(f.id));
-               return (
-                 <LayerItem 
-                   key={groupName} 
-                   label={`${groupName}`} 
-                   active={isGroupVisible} 
-                   onChange={() => {
-                     const { toggleGroupVisibility } = useMapStore.getState();
-                     toggleGroupVisibility(groupName);
-                   }} 
-                   onContextMenu={(e) => handleContextMenu(e, `scratch-${groupName}`, groupName, 'scratch')}
-                 />
-               );
-             })}
-           </div>
-         </>
-       )}
-       
-       <div className="h-px bg-border/50 my-2" />
-       
-       <div className="flex flex-col gap-1">
-         <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest px-1 mb-1">Basemaps</span>
-         {baseLayers.map(layer => (
-           <LayerItem 
-             key={layer.id} 
-             label={layer.name} 
-             active={layer.visible} 
-             onChange={() => toggleLayer(layer.id)} 
-           />
-         ))}
-         {referenceLayers.map(layer => (
-           <LayerItem 
-             key={layer.id} 
-             label={layer.name} 
-             active={layer.visible} 
-             onChange={() => toggleLayer(layer.id)} 
-           />
-         ))}
-       </div>
+        {projectLayer && (
+          <LayerItem
+            label={projectLayer.name}
+            active={projectLayer.visible}
+            onChange={() => toggleLayer(projectLayer.id)}
+            onContextMenu={(e) =>
+              handleContextMenu(e, projectLayer.id, projectLayer.name)
+            }
+            expanded={
+              projectLayer.visible && Object.keys(projectGroups).length > 0
+            }
+          >
+            <div className="mt-1 ml-4 flex flex-col gap-1 border-l border-border/50 pl-2">
+              {Object.entries(projectGroups).map(([groupName, features]) => {
+                const isGroupVisible = features.some(
+                  (f) => !hiddenFeatureIds.has(f.id)
+                )
+                const isExpanded = expandedGroups.has(`project-${groupName}`)
+                return (
+                  <LayerItem
+                    key={groupName}
+                    label={`${groupName}`}
+                    active={isGroupVisible}
+                    expanded={isExpanded}
+                    onToggleExpand={() =>
+                      toggleGroupExpansion(`project-${groupName}`)
+                    }
+                    onChange={() => {
+                      const { toggleGroupVisibility } = useMapStore.getState()
+                      toggleGroupVisibility(groupName)
+                    }}
+                    onContextMenu={(e) =>
+                      handleContextMenu(
+                        e,
+                        `group-${groupName}`,
+                        groupName,
+                        "project"
+                      )
+                    }
+                  >
+                    <div className="mt-1 ml-4 flex flex-col gap-1 border-l border-border/30 pl-2">
+                      {features.map((f) => (
+                        <LayerItem
+                          key={f.id}
+                          label={f.name || "Unnamed Feature"}
+                          active={!hiddenFeatureIds.has(f.id)}
+                          onChange={() => {
+                            const { toggleFeatureVisibility } =
+                              useMapStore.getState()
+                            toggleFeatureVisibility(f.id)
+                          }}
+                          onContextMenu={(e) =>
+                            handleContextMenu(
+                              e,
+                              f.id,
+                              f.name || "Unnamed Feature",
+                              "feature"
+                            )
+                          }
+                        />
+                      ))}
+                    </div>
+                  </LayerItem>
+                )
+              })}
+            </div>
+          </LayerItem>
+        )}
+
+        {overlayLayers.map((layer) => (
+          <LayerItem
+            key={layer.id}
+            label={layer.name}
+            active={layer.visible}
+            onChange={() => toggleLayer(layer.id)}
+            onContextMenu={(e) => handleContextMenu(e, layer.id, layer.name)}
+          />
+        ))}
+      </div>
+
+      {Object.keys(scratchGroups).length > 0 && (
+        <>
+          <div className="my-2 h-px bg-border/50" />
+          <div className="flex flex-col gap-1">
+            <span className="mb-1 px-1 text-[10px] font-bold tracking-widest text-muted-foreground uppercase">
+              Independent Layers
+            </span>
+            {Object.entries(scratchGroups).map(([groupName, features]) => {
+              const isGroupVisible = features.some(
+                (f) => !hiddenFeatureIds.has(f.id)
+              )
+              const isExpanded = expandedGroups.has(`scratch-${groupName}`)
+              return (
+                <LayerItem
+                  key={groupName}
+                  label={`${groupName}`}
+                  active={isGroupVisible}
+                  expanded={isExpanded}
+                  onToggleExpand={() =>
+                    toggleGroupExpansion(`scratch-${groupName}`)
+                  }
+                  onChange={() => {
+                    const { toggleGroupVisibility } = useMapStore.getState()
+                    toggleGroupVisibility(groupName)
+                  }}
+                  onContextMenu={(e) =>
+                    handleContextMenu(
+                      e,
+                      `scratch-${groupName}`,
+                      groupName,
+                      "scratch"
+                    )
+                  }
+                >
+                  <div className="mt-1 ml-4 flex flex-col gap-1 border-l border-border/30 pl-2">
+                    {features.map((f) => (
+                      <LayerItem
+                        key={f.id}
+                        label={f.name || "Unnamed Feature"}
+                        active={!hiddenFeatureIds.has(f.id)}
+                        onChange={() => {
+                          const { toggleFeatureVisibility } =
+                            useMapStore.getState()
+                          toggleFeatureVisibility(f.id)
+                        }}
+                        onContextMenu={(e) =>
+                          handleContextMenu(
+                            e,
+                            f.id,
+                            f.name || "Unnamed Feature",
+                            "feature"
+                          )
+                        }
+                      />
+                    ))}
+                  </div>
+                </LayerItem>
+              )
+            })}
+          </div>
+        </>
+      )}
+
+      <div className="my-2 h-px bg-border/50" />
+
+      <div className="flex flex-col gap-1">
+        <span className="mb-1 px-1 text-[10px] font-bold tracking-widest text-muted-foreground uppercase">
+          Basemaps
+        </span>
+        {baseLayers.map((layer) => (
+          <LayerItem
+            key={layer.id}
+            label={layer.name}
+            active={layer.visible}
+            onChange={() => toggleLayer(layer.id)}
+          />
+        ))}
+        {referenceLayers.map((layer) => (
+          <LayerItem
+            key={layer.id}
+            label={layer.name}
+            active={layer.visible}
+            onChange={() => toggleLayer(layer.id)}
+          />
+        ))}
+      </div>
     </div>
-  );
-};
+  )
+}

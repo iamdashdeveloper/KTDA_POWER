@@ -52,6 +52,9 @@ const geoJsonFormat = new GeoJSON()
 let latestMapInstance: Map | null = null
 export const getMapInstance = () => latestMapInstance
 
+const NAIROBI_COORDS: [number, number] = [36.817223, -1.286389]
+
+
 export const OpenLayersMap: React.FC = () => {
   const mapRef = React.useRef<HTMLDivElement>(null)
 
@@ -97,21 +100,95 @@ export const OpenLayersMap: React.FC = () => {
     animation: TileLayer<XYZ>
   } | null>(null)
 
-  // Sync Individual Feature Visibility
-  React.useEffect(() => {
-    if (!layersRef.current) return
-    const source = layersRef.current.features.getSource()
-    if (!source) return
+  // Sync Individual Feature Visibility & Store Updates
+  const projectFeaturesStore = useMapStore((state) => state.projectFeatures)
+  const scratchFeaturesStore = useMapStore((state) => state.scratchFeatures)
 
-    source.getFeatures().forEach((f) => {
-      const id = f.get("id")
-      if (hiddenFeatureIds.has(id)) {
-        f.setStyle(() => []) // Hide
-      } else {
-        f.setStyle(undefined) // Use layer default style
+  React.useEffect(() => {
+
+    if (!layersRef.current) return
+    const featureSource = layersRef.current.features.getSource()
+    if (!featureSource) return
+
+    featureSource.clear()
+
+    const projectCoords =
+      getProjectCoordinates(activeProject?.location) || NAIROBI_COORDS
+
+    const geojsonFeatures = [...projectFeaturesStore, ...scratchFeaturesStore]
+      .map((f) => {
+        let geometry = f.geometry
+
+        // Fallback for null geometry: use project coordinates
+        if (!geometry && projectCoords) {
+          geometry = {
+            type: "Point",
+            coordinates: projectCoords,
+          }
+        }
+
+        if (!geometry) return null
+
+        // Strip geometry and coordinates from properties to avoid conflicts in OpenLayers
+        const {
+          geometry: _geom,
+          coordinates: _coords,
+          ...properties
+        } = f as any
+
+        return {
+          type: "Feature",
+          id: f.id,
+          geometry: geometry,
+          properties: properties,
+        }
+      })
+      .filter(Boolean)
+
+    if (geojsonFeatures.length > 0) {
+      try {
+        const olFeatures = geoJsonFormat.readFeatures(
+          {
+            type: "FeatureCollection",
+            features: geojsonFeatures,
+          },
+          {
+            featureProjection: "EPSG:3857",
+            dataProjection: "EPSG:4326",
+          }
+        )
+
+        // Final validation and style application
+        const validOlFeatures = olFeatures.filter((f) => {
+          const id = f.getId() || f.get("id")
+          if (id) {
+            f.setId(id)
+            if (hiddenFeatureIds.has(id as string)) {
+              f.setStyle(() => [])
+            }
+          }
+
+          const geom = f.getGeometry()
+          return geom && typeof (geom as any).getExtent === "function"
+        })
+
+        if (validOlFeatures.length > 0) {
+          featureSource.addFeatures(validOlFeatures)
+        }
+      } catch (err) {
+        console.error("[OpenLayersMap] Failed to parse features:", err)
       }
-    })
-  }, [hiddenFeatureIds])
+    }
+  }, [
+    projectFeaturesStore,
+    scratchFeaturesStore,
+    hiddenFeatureIds,
+    activeProject?.location,
+  ])
+
+
+
+
 
   const [_, setMapInstance] = React.useState<Map | null>(null)
   const mapInstanceRef = React.useRef<Map | null>(null)
@@ -518,6 +595,8 @@ export const OpenLayersMap: React.FC = () => {
       setIsLoading(true)
       setError(null)
       try {
+        const issueSource = layersRef.current!.issues.getSource()
+
         const scratchIds = JSON.parse(
           localStorage.getItem("scratch_layers") || "[]"
         )
@@ -625,47 +704,7 @@ export const OpenLayersMap: React.FC = () => {
           })
         )
 
-        // Clear and add Features
-        const featureSource = layersRef.current!.features.getSource()
-        featureSource?.clear()
-
-        const geojsonFeatures = [...featuresData, ...scratchFeaturesData]
-          .map((f) => {
-            const geometry = parseGeometry(f.geometry)
-            if (!geometry) return null
-
-            const { geometry: _, ...properties } = f
-
-            return {
-              type: "Feature",
-              geometry,
-              properties: { ...properties, id: f.id },
-            }
-          })
-          .filter(Boolean)
-
-        if (geojsonFeatures.length > 0) {
-          const features = geoJsonFormat.readFeatures(
-            {
-              type: "FeatureCollection",
-              features: geojsonFeatures,
-            },
-            {
-              featureProjection: "EPSG:3857",
-            }
-          )
-          // Set feature IDs from properties
-          features.forEach((feature) => {
-            const id = feature.get("id")
-            if (id) {
-              feature.setId(id)
-            }
-          })
-          featureSource?.addFeatures(features)
-        }
-
         // Clear and add Issues
-        const issueSource = layersRef.current!.issues.getSource()
         issueSource?.clear()
 
         const issueFeatures = issuesData
@@ -701,24 +740,49 @@ export const OpenLayersMap: React.FC = () => {
           issueSource?.addFeatures(issueFeatures)
         }
 
-        // Center view
-        const projectCoords = getProjectCoordinates(activeProject.location)
-        if (projectCoords) {
+        // CENTER VIEW only on first load or manual refresh
+        let zoomExtent = createEmpty()
+        const allGeoJSONFeatures = [...featuresData, ...scratchFeaturesData]
+
+        if (allGeoJSONFeatures.length > 0) {
+          // Calculate extent from GeoJSON data directly
+          const olFeatures = geoJsonFormat.readFeatures(
+            {
+              type: "FeatureCollection",
+              features: allGeoJSONFeatures.map((f) => ({
+                type: "Feature",
+                geometry: parseGeometry(f.geometry),
+                properties: {},
+              })),
+            },
+            {
+              featureProjection: "EPSG:3857",
+              dataProjection: "EPSG:4326",
+            }
+          )
+
+          olFeatures.forEach((f) => {
+            const geom = f.getGeometry()
+            if (geom) extend(zoomExtent, geom.getExtent())
+          })
+        }
+
+        if (!isEmpty(zoomExtent)) {
+          mapInstanceRef.current?.getView().fit(zoomExtent, {
+            padding: [100, 100, 100, 100],
+            duration: 1000,
+            maxZoom: 18,
+          })
+        } else {
+          // Default to Nairobi if no features
           mapInstanceRef.current?.getView().animate({
-            center: fromLonLat(projectCoords),
-            zoom: 16,
+            center: fromLonLat(NAIROBI_COORDS),
+            zoom: 13,
             duration: 1000,
           })
-        } else if (featureSource?.getFeatures().length) {
-          const extent = featureSource.getExtent()
-          if (extent && !isEmpty(extent)) {
-            mapInstanceRef.current?.getView().fit(extent, {
-              padding: [50, 50, 50, 50],
-              duration: 1000,
-            })
-          }
         }
       } catch (err) {
+
         console.error("Failed to load project data:", err)
         setError("Failed to load map data")
       } finally {
@@ -739,7 +803,7 @@ export const OpenLayersMap: React.FC = () => {
 
     switch (id) {
       case "zoom-home":
-        const projectCoords = getProjectCoordinates(activeProject?.location)
+        const projectCoords = getProjectCoordinates(activeProject?.location) || NAIROBI_COORDS
         if (projectCoords) {
           view.animate({
             center: fromLonLat(projectCoords),
@@ -748,6 +812,7 @@ export const OpenLayersMap: React.FC = () => {
           })
         }
         break
+
       case "full-extent":
         const extent = layersRef.current?.features.getSource()?.getExtent()
         if (extent)
@@ -766,14 +831,25 @@ export const OpenLayersMap: React.FC = () => {
 
         let zoomExtent = createEmpty()
 
-        if (layerType === "project" || layerType === "scratch") {
+        if (
+          layerType === "project" ||
+          layerType === "scratch" ||
+          layerType === "feature"
+        ) {
           const features =
             layersRef.current?.features.getSource()?.getFeatures() || []
+
           const matchingFeatures = features.filter((f) => {
             const props = f.getProperties()
-            const cleanId = layerId
-              .replace("group-", "")
-              .replace("scratch-", "")
+            const id = f.getId()
+
+            // If it's a specific feature, match by ID
+            if (layerType === "feature") {
+              return id === layerId || props.id === layerId
+            }
+
+            // If it's a group, match by group name or group ID
+            const cleanId = layerId.replace("group-", "").replace("scratch-", "")
             return (
               props.groupName === layerName ||
               props.groupId === cleanId ||
@@ -806,6 +882,7 @@ export const OpenLayersMap: React.FC = () => {
         }
         break
       }
+
       case "zoom-to-location":
         if ("geolocation" in navigator) {
           navigator.geolocation.getCurrentPosition((position) => {
@@ -820,7 +897,19 @@ export const OpenLayersMap: React.FC = () => {
           })
         }
         break
+      case "locate-to": {
+        const { longitude, latitude, zoom = 16 } = currentCommand.payload || {}
+        if (longitude !== undefined && latitude !== undefined) {
+          view.animate({
+            center: fromLonLat([longitude, latitude]),
+            zoom: zoom,
+            duration: 1000,
+          })
+        }
+        break
+      }
       default:
+
         console.log("Command not implemented in MapCanvas:", id)
     }
   }, [currentCommand, activeProject])

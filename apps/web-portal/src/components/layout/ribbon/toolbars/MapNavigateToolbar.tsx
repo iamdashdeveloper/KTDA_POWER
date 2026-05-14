@@ -6,8 +6,9 @@ import { RibbonButton } from '../RibbonButton';
 // Modular Tools
 import { ZoomToHome } from '../tools/navigation/ZoomToHome';
 import { ZoomToLocation } from '../tools/navigation/ZoomToLocation';
-
 import { ZoomBox } from '../tools/navigation/ZoomBox';
+
+
 
 interface MapNavigateToolbarProps {
   activeTool: string | null;
@@ -32,6 +33,8 @@ export const MapNavigateToolbar: React.FC<MapNavigateToolbarProps> = ({
           <ZoomToHome onClick={onToolClick} />
           <ZoomToLocation onClick={onToolClick} />
           <ZoomBox onClick={onToolClick} />
+
+
         </div>
       </div>
     </RibbonGroup>

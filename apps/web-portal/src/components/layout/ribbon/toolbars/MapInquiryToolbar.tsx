@@ -10,6 +10,9 @@ import {
 import { RibbonGroup } from "../RibbonGroup"
 import { RibbonButton } from "../RibbonButton"
 import { SiOpen3D } from "react-icons/si";
+import { LocateModal } from "@/components/modals/LocateModal"
+
+
 interface MapInquiryToolbarProps {
   activeTool: string | null
   onToolClick: (toolId: string) => void
@@ -21,13 +24,17 @@ export const MapInquiryToolbar: React.FC<MapInquiryToolbarProps> = ({
   activeTool,
   onToolClick,
 }) => {
+  const [locateModalOpen, setLocateModalOpen] = React.useState(false)
+
   return (
-    <RibbonGroup label="Inquiry">
-      <RibbonButton
-        icon={<Search size={24} />}
-        label="Locate"
-        onClick={() => onToolClick("locate")}
-      />
+    <>
+      <RibbonGroup label="Inquiry">
+        <RibbonButton
+          icon={<Search size={24} />}
+          label="Locate"
+          onClick={() => setLocateModalOpen(true)}
+        />
+
       <RibbonButton
         icon={<Info size={24} />}
         label="Identify"
@@ -66,6 +73,12 @@ export const MapInquiryToolbar: React.FC<MapInquiryToolbarProps> = ({
           />
         </div>
       </div>
-    </RibbonGroup>
+      </RibbonGroup>
+      <LocateModal
+        isOpen={locateModalOpen}
+        onClose={() => setLocateModalOpen(false)}
+      />
+    </>
+
   )
 }

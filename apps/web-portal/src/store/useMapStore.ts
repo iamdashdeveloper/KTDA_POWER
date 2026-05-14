@@ -31,7 +31,11 @@ interface MapStore {
   setScratchFeatures: (features: ProjectFeature[]) => void
   addScratchFeature: (feature: ProjectFeature) => void
   removeScratchFeature: (id: string) => void
+  removeProjectFeature: (id: string) => void
+  removeProjectFeatureGroup: (groupName: string) => void
+  removeScratchFeatureGroup: (groupName: string) => void
   toggleFeatureVisibility: (id: string) => void
+  setHiddenFeatureIds: (hiddenIds: Set<string>) => void
   toggleGroupVisibility: (groupName: string) => void
   // View Mode
   viewMode: "2D" | "TERRAIN_3D"
@@ -77,7 +81,9 @@ interface MapStore {
     visibleClasses: number[]
     paletteOverrides: Record<number, string>
   }
-  setDynamicWorldConfig: (config: Partial<MapStore["dynamicWorldConfig"]>) => void
+  setDynamicWorldConfig: (
+    config: Partial<MapStore["dynamicWorldConfig"]>
+  ) => void
   // Compare Layers
   compareConfig: {
     active: boolean
@@ -162,6 +168,22 @@ export const useMapStore = create<MapStore>((set) => ({
     set((state) => ({
       scratchFeatures: state.scratchFeatures.filter((f) => f.id !== id),
     })),
+  removeProjectFeature: (id) =>
+    set((state) => ({
+      projectFeatures: state.projectFeatures.filter((f) => f.id !== id),
+    })),
+  removeProjectFeatureGroup: (groupName) =>
+    set((state) => ({
+      projectFeatures: state.projectFeatures.filter(
+        (f) => (f.groupName || "Other Features") !== groupName
+      ),
+    })),
+  removeScratchFeatureGroup: (groupName) =>
+    set((state) => ({
+      scratchFeatures: state.scratchFeatures.filter(
+        (f) => (f.groupName || "Scratch Layer") !== groupName
+      ),
+    })),
   toggleFeatureVisibility: (id) =>
     set((state) => {
       const next = new Set(state.hiddenFeatureIds)
@@ -169,11 +191,18 @@ export const useMapStore = create<MapStore>((set) => ({
       else next.add(id)
       return { hiddenFeatureIds: next }
     }),
+  setHiddenFeatureIds: (hiddenIds) => set({ hiddenFeatureIds: hiddenIds }),
   toggleGroupVisibility: (groupName) =>
     set((state) => {
-      const groupFeatures = state.projectFeatures.filter(
+      // Check both project features and scratch features for the group
+      const projectGroupFeatures = state.projectFeatures.filter(
         (f) => (f.groupName || "Other Features") === groupName
       )
+      const scratchGroupFeatures = state.scratchFeatures.filter(
+        (f) => (f.groupName || "Scratch Layer") === groupName
+      )
+
+      const groupFeatures = [...projectGroupFeatures, ...scratchGroupFeatures]
       const featureIds = groupFeatures.map((f) => f.id)
       const isVisible = featureIds.some((id) => !state.hiddenFeatureIds.has(id))
 
@@ -187,6 +216,7 @@ export const useMapStore = create<MapStore>((set) => ({
       }
       return { hiddenFeatureIds: next }
     }),
+
   featureCount: 0,
   issueCount: 0,
   setStats: (features, issues) =>
@@ -210,7 +240,9 @@ export const useMapStore = create<MapStore>((set) => ({
   dynamicWorldTileUrl: null,
   setDynamicWorldTileUrl: (url) => set({ dynamicWorldTileUrl: url }),
   dynamicWorldConfig: {
-    startDate: new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString().split("T")[0],
+    startDate: new Date(Date.now() - 90 * 24 * 60 * 60 * 1000)
+      .toISOString()
+      .split("T")[0],
     endDate: new Date().toISOString().split("T")[0],
     opacity: 0.85,
     visibleClasses: [],

@@ -8,6 +8,7 @@ interface LayerItemProps {
   expanded?: boolean;
   children?: React.ReactNode;
   onChange?: () => void;
+  onToggleExpand?: () => void;
   onContextMenu?: (e: React.MouseEvent) => void;
 }
 
@@ -17,6 +18,7 @@ export const LayerItem: React.FC<LayerItemProps> = ({
   expanded, 
   children, 
   onChange,
+  onToggleExpand,
   onContextMenu
 }) => (
   <div className="flex flex-col" onContextMenu={onContextMenu}>
@@ -34,7 +36,19 @@ export const LayerItem: React.FC<LayerItemProps> = ({
         className="flex items-center gap-1.5 flex-1 cursor-pointer" 
         onClick={onChange}
       >
-        {children ? (expanded ? <ChevronDown size={10} /> : <ChevronRight size={10} />) : <div className="w-[10px]" />}
+        {children ? (
+          <div 
+            onClick={(e) => {
+              e.stopPropagation();
+              onToggleExpand?.();
+            }}
+            className="hover:text-primary transition-colors"
+          >
+            {expanded ? <ChevronDown size={10} /> : <ChevronRight size={10} />}
+          </div>
+        ) : (
+          <div className="w-[10px]" />
+        )}
         <span className={cn(
           "text-[11px] group-hover:text-primary transition-colors truncate", 
           active ? "font-medium text-foreground" : "text-muted-foreground"

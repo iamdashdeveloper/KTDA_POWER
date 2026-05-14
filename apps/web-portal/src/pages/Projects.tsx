@@ -16,6 +16,8 @@ import {
   Info,
 } from "lucide-react"
 import { cn } from "@workspace/ui/lib/utils"
+import { CreateProjectCompanyModal } from "@/components/modals/CreateProjectCompanyModal"
+
 
 interface ProjectWithAccess extends Project {
   hasAccess: boolean
@@ -28,31 +30,33 @@ export default function Projects() {
   const [projects, setProjects] = useState<ProjectWithAccess[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [searchQuery, setSearchQuery] = useState("")
+  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false)
+
+  const fetchProjects = async () => {
+    setIsLoading(true)
+    try {
+      // Use ApiClient for proper error handling and retry logic
+      const data = await ApiClient.get<Project[]>("/projects")
+      const projectsData = Array.isArray(data)
+        ? data
+        : (data as any)?.data || data
+
+      const projectsWithAccess = projectsData.map((project: Project) => ({
+        ...project,
+        hasAccess: true, // For now, assume access in web-portal
+      }))
+      setProjects(projectsWithAccess)
+    } catch (error) {
+      console.error("Error fetching projects:", error)
+    } finally {
+      setIsLoading(false)
+    }
+  }
 
   useEffect(() => {
-    const fetchProjects = async () => {
-      setIsLoading(true)
-      try {
-        // Use ApiClient for proper error handling and retry logic
-        const data = await ApiClient.get<Project[]>("/projects")
-        const projectsData = Array.isArray(data)
-          ? data
-          : (data as any)?.data || data
-
-        const projectsWithAccess = projectsData.map((project: Project) => ({
-          ...project,
-          hasAccess: true, // For now, assume access in web-portal
-        }))
-        setProjects(projectsWithAccess)
-      } catch (error) {
-        console.error("Error fetching projects:", error)
-      } finally {
-        setIsLoading(false)
-      }
-    }
-
     fetchProjects()
   }, [])
+
 
   const handleOpenProject = (project: Project) => {
     setActiveProject(project)
@@ -84,12 +88,22 @@ export default function Projects() {
         </div>
 
         <div className="flex-1 py-4">
-          <SidebarItem icon={<FolderOpen size={18} />} label="Open" active />
-          <SidebarItem icon={<Plus size={18} />} label="New" />
+          <SidebarItem 
+            icon={<FolderOpen size={18} />} 
+            label="Open" 
+            active 
+            onClick={() => {}} // Already on Open tab
+          />
+          <SidebarItem 
+            icon={<Plus size={18} />} 
+            label="New" 
+            onClick={() => setIsCreateModalOpen(true)}
+          />
           <SidebarItem icon={<Clock size={18} />} label="Recent" />
           <div className="mx-4 my-4 border-t border-border" />
           <SidebarItem icon={<Info size={18} />} label="About" />
         </div>
+
 
         <div className="border-t border-border p-4">
           <div className="flex items-center gap-3">
@@ -154,7 +168,14 @@ export default function Projects() {
           )}
         </div>
       </div>
+
+      <CreateProjectCompanyModal
+        isOpen={isCreateModalOpen}
+        onClose={() => setIsCreateModalOpen(false)}
+        onSuccess={fetchProjects}
+      />
     </div>
+
   )
 }
 
@@ -162,13 +183,16 @@ function SidebarItem({
   icon,
   label,
   active = false,
+  onClick,
 }: {
   icon: any
   label: string
   active?: boolean
+  onClick?: () => void
 }) {
   return (
     <div
+      onClick={onClick}
       className={cn(
         "flex cursor-pointer items-center gap-3 px-6 py-3 text-sm font-medium transition-colors",
         active
@@ -181,6 +205,7 @@ function SidebarItem({
     </div>
   )
 }
+
 
 function ProjectCard({
   project,
