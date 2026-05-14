@@ -44,12 +44,9 @@ export class CesiumSyncManager {
     this.setupVectorStyling()
 
     // Enable sync — this starts the Cesium render loop and camera sync
-    this.olcs
-      .setEnabled(true)(
-        // Enable auto render loop as per ol-cesium examples
-        this.olcs as any
-      )
-      .enableAutoRenderLoop()
+    this.olcs.setEnabled(true)
+    this.olcs.enableAutoRenderLoop()
+
 
     // Enable shadows for vector layers
     this.olMap.getLayers().forEach((layer) => {
