@@ -13,41 +13,54 @@ export interface AnalysisLayer {
 
 interface GeoprocessingState {
   analysisLayers: AnalysisLayer[]
-  addAnalysisLayer: (layer: Omit<AnalysisLayer, "id" | "createdAt" | "visible">) => void
+  selectedLayerId: string | null
+  addAnalysisLayer: (
+    layer: Omit<AnalysisLayer, "id" | "createdAt" | "visible">
+  ) => void
   removeAnalysisLayer: (id: string) => void
   toggleVisibility: (id: string) => void
   clearLayers: () => void
+  setSelectedLayer: (id: string | null) => void
 }
+
 
 export const useGeoprocessingStore = create<GeoprocessingState>()(
   persist(
     (set) => ({
       analysisLayers: [],
-      
-      addAnalysisLayer: (layer) => set((state) => ({
-        analysisLayers: [
-          ...state.analysisLayers,
-          {
-            ...layer,
-            id: `analysis-${Date.now()}`,
-            createdAt: Date.now(),
-            visible: true
-          }
-        ]
-      })),
+      selectedLayerId: null,
 
-      removeAnalysisLayer: (id) => set((state) => ({
-        analysisLayers: state.analysisLayers.filter(l => l.id !== id)
-      })),
+      addAnalysisLayer: (layer) =>
+        set((state) => ({
+          analysisLayers: [
+            ...state.analysisLayers,
+            {
+              ...layer,
+              id: `analysis-${Date.now()}`,
+              createdAt: Date.now(),
+              visible: true,
+            },
+          ],
+        })),
 
-      toggleVisibility: (id) => set((state) => ({
-        analysisLayers: state.analysisLayers.map(l => 
-          l.id === id ? { ...l, visible: !l.visible } : l
-        )
-      })),
+      removeAnalysisLayer: (id) =>
+        set((state) => ({
+          analysisLayers: state.analysisLayers.filter((l) => l.id !== id),
+          selectedLayerId: state.selectedLayerId === id ? null : state.selectedLayerId,
+        })),
 
-      clearLayers: () => set({ analysisLayers: [] })
+      toggleVisibility: (id) =>
+        set((state) => ({
+          analysisLayers: state.analysisLayers.map((l) =>
+            l.id === id ? { ...l, visible: !l.visible } : l
+          ),
+        })),
+
+      clearLayers: () => set({ analysisLayers: [], selectedLayerId: null }),
+
+      setSelectedLayer: (id) => set({ selectedLayerId: id }),
     }),
+
     {
       name: "ktda-geoprocessing-storage"
     }

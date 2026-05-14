@@ -13,17 +13,17 @@ interface AnalysisLogicProps {
 const geoJsonFormat = new GeoJSON()
 
 export const AnalysisLogic: React.FC<AnalysisLogicProps> = ({ map }) => {
-  const { analysisLayers } = useGeoprocessingStore()
+  const { analysisLayers, selectedLayerId } = useGeoprocessingStore()
   const layersRef = useRef<Record<string, VectorLayer<VectorSource>>>({})
 
   useEffect(() => {
     if (!map) return
 
     // 1. Identify which layers need to be added, removed, or updated
-    const currentLayerIds = new Set(analysisLayers.map(l => l.id))
-    
+    const currentLayerIds = new Set(analysisLayers.map((l) => l.id))
+
     // Remove layers that are no longer in the store
-    Object.keys(layersRef.current).forEach(id => {
+    Object.keys(layersRef.current).forEach((id) => {
       if (!currentLayerIds.has(id)) {
         map.removeLayer(layersRef.current[id])
         delete layersRef.current[id]
@@ -31,8 +31,9 @@ export const AnalysisLogic: React.FC<AnalysisLogicProps> = ({ map }) => {
     })
 
     // Add or Update layers
-    analysisLayers.forEach(layer => {
+    analysisLayers.forEach((layer) => {
       let vectorLayer = layersRef.current[layer.id]
+      const isSelected = layer.id === selectedLayerId
 
       if (!vectorLayer) {
         // Create new layer
@@ -41,43 +42,47 @@ export const AnalysisLogic: React.FC<AnalysisLogicProps> = ({ map }) => {
             {
               type: "Feature",
               geometry: layer.geometry,
-              properties: { id: layer.id, name: layer.name }
+              properties: { id: layer.id, name: layer.name },
             },
             {
-              featureProjection: "EPSG:3857"
+              featureProjection: "EPSG:3857",
             }
-          )
+          ),
         })
 
         vectorLayer = new VectorLayer({
           source,
           zIndex: 50, // Analysis results should be on top
-          style: new Style({
-            fill: new Fill({
-              color: layer.color + "33", // 20% opacity
-            }),
-            stroke: new Stroke({
-              color: layer.color,
-              width: 2,
-              lineDash: [4, 4] // Dashed lines for analysis results
-            }),
-            image: new CircleStyle({
-              radius: 6,
-              fill: new Fill({ color: layer.color }),
-              stroke: new Stroke({ color: "#ffffff", width: 2 })
-            })
-          })
         })
 
         map.addLayer(vectorLayer)
         layersRef.current[layer.id] = vectorLayer
       }
 
+      // Update style based on selection
+      vectorLayer.setStyle(
+        new Style({
+          fill: new Fill({
+            color: isSelected ? "#facc1555" : layer.color + "33", // Highlight with yellow if selected
+          }),
+          stroke: new Stroke({
+            color: isSelected ? "#facc15" : layer.color,
+            width: isSelected ? 4 : 2,
+            lineDash: isSelected ? undefined : [4, 4],
+          }),
+          image: new CircleStyle({
+            radius: isSelected ? 8 : 6,
+            fill: new Fill({ color: isSelected ? "#facc15" : layer.color }),
+            stroke: new Stroke({ color: "#ffffff", width: 2 }),
+          }),
+        })
+      )
+
       // Sync visibility
       vectorLayer.setVisible(layer.visible)
     })
+  }, [analysisLayers, selectedLayerId, map])
 
-  }, [analysisLayers, map])
 
   return null
 }

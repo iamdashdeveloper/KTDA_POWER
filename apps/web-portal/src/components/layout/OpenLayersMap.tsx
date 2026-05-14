@@ -2,6 +2,8 @@ import * as React from "react"
 import { AlertCircle } from "lucide-react"
 import { useProjectStore } from "@/store/useProjectStore"
 import { useMapStore } from "@/store/useMapStore"
+import { useGeoprocessingStore } from "@/store/useGeoprocessingStore"
+
 import {
   loadProjectFeatures,
   loadProjectIssues,
@@ -329,7 +331,15 @@ export const OpenLayersMap: React.FC = () => {
           "Feature Details"
         )
         setCollapsed("right", false)
+      } else if (toolRef.current === "select") {
+        // Handle selection for analysis layers or other layers
+        const id = properties.id
+        if (typeof id === "string" && id.startsWith("analysis-")) {
+          const { setSelectedLayer } = useGeoprocessingStore.getState()
+          setSelectedLayer(id)
+        }
       }
+
     })
 
     latestMapInstance = map

@@ -14,7 +14,13 @@ import {
   Box,
   Cloud,
   Loader2,
+  Save,
+  Eraser,
+  Trash,
+  MousePointer2,
+  Download,
 } from "lucide-react"
+
 import { TbMapQuestion } from "react-icons/tb";
 // import { TbMapPinHeart } from "react-icons/tb";
 import { LuWaypoints } from "react-icons/lu";
@@ -40,7 +46,10 @@ import { VscLayersDot } from "react-icons/vsc";
 import { TbMapBolt, TbColumns, TbHistory } from "react-icons/tb";
 import { CompareLayersPanel } from "../../../compare/CompareLayersPanel"
 import { TimeAnimationPanel } from "../../../temporal/TimeAnimationPanel"
+import { useGeoprocessingStore } from "@/store/useGeoprocessingStore"
+
 interface AnalysisToolbarProps {
+
   onToolClick: (toolId: string) => void
 }
 
@@ -54,7 +63,38 @@ export const AnalysisToolbar: React.FC<AnalysisToolbarProps> = ({
   const [isCreateHydroModelOpen, setIsCreateHydroModelOpen] = useState(false)
   const [isLoadHydroModelOpen, setIsLoadHydroModelOpen] = useState(false)
   const [isZonalStatsOpen, setIsZonalStatsOpen] = useState(false)
+  const { analysisLayers, removeAnalysisLayer, clearLayers, selectedLayerId } = useGeoprocessingStore()
   const [isLoadingLandCover, setIsLoadingLandCover] = useState(false)
+
+  const handleSaveResult = (layerId: string | null) => {
+    const layersToSave = layerId 
+      ? analysisLayers.filter(l => l.id === layerId)
+      : analysisLayers
+
+    if (layersToSave.length === 0) return
+
+    layersToSave.forEach(layer => {
+      const geojson = {
+        type: "Feature",
+        geometry: layer.geometry,
+        properties: {
+          name: layer.name,
+          type: layer.type,
+          createdAt: new Date(layer.createdAt).toISOString()
+        }
+      }
+      const blob = new Blob([JSON.stringify(geojson, null, 2)], { type: "application/json" })
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement("a")
+      a.href = url
+      a.download = `${layer.name.replace(/\s+/g, '_')}_${layer.id}.geojson`
+      document.body.appendChild(a)
+      a.click()
+      document.body.removeChild(a)
+      URL.revokeObjectURL(url)
+    })
+  }
+
 
   const is3D = viewMode === "TERRAIN_3D"
 
@@ -125,17 +165,59 @@ export const AnalysisToolbar: React.FC<AnalysisToolbarProps> = ({
       <RibbonSeparator />
 
       <RibbonGroup label="Workflows">
-        <RibbonButton
-          icon={<Cpu size={24} />}
-          label="Geoprocessing"
-          onClick={() => openPanel("right", <GeoprocessingPanel />, "Geoprocessing Toolbox")}
-        />
+        <div className="flex flex-col gap-1">
+          <RibbonSmallButton
+            icon={<Cpu size={14} />}
+            label="Geoprocessing"
+            onClick={() => openPanel("right", <GeoprocessingPanel />, "Geoprocessing Toolbox")}
+          />
+          <RibbonSmallButton
+            icon={<MousePointer2 size={14} />}
+            label="Select Result"
+            active={useMapStore.getState().activeTool === "select"}
+            onClick={() => onToolClick("select")}
+          />
+          <RibbonSmallButton
+            icon={<Eraser size={14} />}
+            label="Delete Result"
+            disabled={!selectedLayerId}
+            onClick={() => {
+              if (selectedLayerId) removeAnalysisLayer(selectedLayerId)
+            }}
+          />
+          
+        </div>
+
+        <div className="ml-1 flex flex-col justify-center gap-1 border-l border-border/50 pl-2">
+          <RibbonSmallButton
+            icon={<Trash size={14} />}
+            label="Delete All"
+            disabled={analysisLayers.length === 0}
+            onClick={() => clearLayers()}
+          />
+          <RibbonSmallButton
+            icon={<Save size={14} />}
+            label="Save All"
+            disabled={analysisLayers.length === 0}
+            onClick={() => handleSaveResult(null)}
+          />
+          <RibbonSmallButton
+            icon={<Download size={14} />}
+            label="Save Result"
+            disabled={!selectedLayerId}
+            onClick={() => handleSaveResult(selectedLayerId)}
+          />
+        </div>
+
+        <RibbonSeparator />
+
         <RibbonButton
           icon={<TbMapQuestion size={24} />}
           label="Suitability"
           onClick={() => onToolClick("suitability-modelling")}
         />
       </RibbonGroup>
+
 
       <RibbonGroup label="Networks">
         <RibbonButton
