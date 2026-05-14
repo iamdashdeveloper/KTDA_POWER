@@ -37,15 +37,17 @@ export class CesiumSyncManager {
       target: "map3d",
     })
 
-    const scene = this.olcs.getCesiumScene()
+    const scene = this.olcs!.getCesiumScene()
+
     this.configureScene(scene)
 
     // Listen for new entities to apply 3D styles/extrusion
     this.setupVectorStyling()
 
     // Enable sync — this starts the Cesium render loop and camera sync
-    this.olcs.setEnabled(true)
-    this.olcs.enableAutoRenderLoop()
+    this.olcs!.setEnabled(true)
+    this.olcs!.enableAutoRenderLoop()
+
 
 
     // Enable shadows for vector layers
@@ -65,7 +67,8 @@ export class CesiumSyncManager {
       `[CesiumSyncManager] Synchronizing layers to 3D. Map has ${this.olMap.getLayers().getLength()} layers.`
     )
 
-    return this.olcs
+    return this.olcs!
+
   }
 
   private setupVectorStyling() {

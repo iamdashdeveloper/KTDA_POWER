@@ -171,7 +171,7 @@ export const Ribbon: React.FC<RibbonProps> = ({ onToolAction }) => {
   }
 
   const handleDrawingSave = async (
-    features: Array<{ name: string; description: string; groupName: string }>,
+    featureData: Array<{ name: string; description: string; groupName: string }>,
     groupName: string
   ) => {
     setIsSavingDrawing(true)
@@ -182,18 +182,50 @@ export const Ribbon: React.FC<RibbonProps> = ({ onToolAction }) => {
         if (map.__getDrawnFeatures) {
           const drawnFeatures = map.__getDrawnFeatures()
 
-          // TODO: Save features to database via API
-          // For now, we'll just add them to scratchFeatures
-          // In a real implementation, you would:
-          // 1. Call API endpoint to save features
-          // 2. Return saved feature IDs from backend
-          // 3. Add to scratchFeatures or projectFeatures
+          if (drawnFeatures.length === 0) {
+            console.warn("No features to save")
+            return
+          }
 
-          console.log("Saving drawn features:", {
-            features,
-            groupName,
-            drawnFeatures,
+          // Convert OL features to GeoJSON
+          const { default: GeoJSON } = await import("ol/format/GeoJSON")
+          const format = new GeoJSON()
+          const geojsonFeatures = drawnFeatures.map((feat: any, index: number) => {
+            const data = featureData[0] // Use first name/desc for now or index if multiple
+            const json = format.writeFeatureObject(feat, {
+              featureProjection: "EPSG:3857",
+              dataProjection: "EPSG:4326",
+            })
+
+            // Add metadata properties
+            json.properties = {
+              ...json.properties,
+              name: data.name + (drawnFeatures.length > 1 ? ` ${index + 1}` : ""),
+              description: data.description,
+              groupName: groupName,
+              createdAt: new Date().toISOString(),
+            }
+            return json
           })
+
+          const featureCollection = {
+            type: "FeatureCollection",
+            features: geojsonFeatures,
+          }
+
+          // Trigger download
+          const blob = new Blob([JSON.stringify(featureCollection, null, 2)], {
+            type: "application/json",
+          })
+          const url = URL.createObjectURL(blob)
+          const a = document.createElement("a")
+          a.href = url
+          a.download = `${groupName.replace(/\s+/g, "_")}.geojson`
+          document.body.appendChild(a)
+          a.click()
+          document.body.removeChild(a)
+          URL.revokeObjectURL(url)
+
 
           // Clear the drawing after saving
           if (map.__clearDrawnFeatures) {
@@ -209,6 +241,7 @@ export const Ribbon: React.FC<RibbonProps> = ({ onToolAction }) => {
       setIsSavingDrawing(false)
     }
   }
+
 
   return (
     <div className="flex shrink-0 flex-col border-b border-border bg-card select-none">

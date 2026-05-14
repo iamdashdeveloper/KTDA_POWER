@@ -38,15 +38,17 @@ export function DrawingModal({
 }: DrawingModalProps) {
   const [name, setName] = useState<string>("")
   const [description, setDescription] = useState<string>("")
-  const [groupName, setGroupName] = useState<string>("")
-  const [autoGroup, setAutoGroup] = useState<boolean>(true)
+  const [fileName, setFileName] = useState<string>("")
+  const [autoName, setAutoName] = useState<boolean>(true)
+
   const [error, setError] = useState<string | null>(null)
 
-  // Generate group name from current timestamp
-  const generateGroupName = () => {
+  // Generate file name from current timestamp
+  const generateFileName = () => {
     const now = new Date()
-    return `Drawn_${now.toISOString().split("T")[0]}_${now.getHours()}-${now.getMinutes()}`
+    return `Drawing_${now.toISOString().split("T")[0]}_${now.getHours()}-${now.getMinutes()}`
   }
+
 
   const handleSave = () => {
     if (!name.trim()) {
@@ -62,23 +64,25 @@ export function DrawingModal({
     setError(null)
 
     if (onSave) {
-      const finalGroupName = autoGroup ? generateGroupName() : groupName
+      const finalFileName = autoName ? generateFileName() : fileName
       onSave(
         [
           {
             name: name.trim(),
             description: description.trim(),
-            groupName: finalGroupName,
+            groupName: finalFileName,
           },
         ],
-        finalGroupName
+        finalFileName
       )
     }
+
 
     // Reset form
     setName("")
     setDescription("")
-    setGroupName("")
+    setFileName("")
+
 
     // Close after a short delay
     setTimeout(() => {
@@ -154,37 +158,38 @@ export function DrawingModal({
             />
           </div>
 
-          {/* Group Name */}
+          {/* File Name */}
           <div className="space-y-3">
             <div className="flex items-center gap-3">
               <Checkbox
-                id="autoGroup"
-                checked={autoGroup}
-                onCheckedChange={(checked) => setAutoGroup(!!checked)}
+                id="autoName"
+                checked={autoName}
+                onCheckedChange={(checked) => setAutoName(!!checked)}
               />
               <Label
-                htmlFor="autoGroup"
+                htmlFor="autoName"
                 className="cursor-pointer text-sm font-medium"
               >
-                Auto-generate group name
+                Auto-generate file name
               </Label>
             </div>
-            {!autoGroup && (
+            {!autoName && (
               <Input
-                placeholder="Custom group name..."
-                value={groupName}
-                onChange={(e) => setGroupName(e.target.value)}
+                placeholder="Custom file name..."
+                value={fileName}
+                onChange={(e) => setFileName(e.target.value)}
                 className="h-10"
               />
             )}
-            {autoGroup && (
+            {autoName && (
               <div className="rounded-lg bg-muted/50 p-2">
                 <p className="font-mono text-xs text-muted-foreground">
-                  {generateGroupName()}
+                  {generateFileName()}.geojson
                 </p>
               </div>
             )}
           </div>
+
 
           {/* Error Message */}
           {error && (
