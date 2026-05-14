@@ -149,11 +149,6 @@ export const CesiumMap: React.FC<CesiumMapProps> = ({ center, zoom }) => {
           </div>
         </div>
       )}
-
-      {/* Cesium attribution */}
-      <div className="absolute right-1 bottom-1 z-10 rounded bg-black/30 px-1 text-[10px] text-white/50">
-        CesiumJS | World Terrain
-      </div>
     </div>
   )
 }
