@@ -14,9 +14,29 @@ import {
   Clock,
   FolderOpen,
   Info,
+  Pencil,
+  Trash2,
 } from "lucide-react"
 import { cn } from "@workspace/ui/lib/utils"
 import { CreateProjectCompanyModal } from "@/components/modals/CreateProjectCompanyModal"
+import { EditProjectModal } from "@/components/modals/EditProjectModal"
+import { toast } from "sonner"
+import {
+  ContextMenu,
+  ContextMenuTrigger,
+  ContextMenuContent,
+  ContextMenuItem,
+} from "@workspace/ui/components/context-menu"
+import {
+  AlertDialog,
+  AlertDialogContent,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogCancel,
+  AlertDialogAction,
+} from "@workspace/ui/components/alert-dialog"
 
 
 interface ProjectWithAccess extends Project {
@@ -31,6 +51,44 @@ export default function Projects() {
   const [isLoading, setIsLoading] = useState(true)
   const [searchQuery, setSearchQuery] = useState("")
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false)
+  const [projectToEdit, setProjectToEdit] = useState<Project | null>(null)
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false)
+  const [projectToDelete, setProjectToDelete] = useState<Project | null>(null)
+  const [isDeleteAlertOpen, setIsDeleteAlertOpen] = useState(false)
+  const [isDeleting, setIsDeleting] = useState(false)
+
+  const handleEditProject = (project: Project) => {
+    setProjectToEdit(project)
+    setIsEditModalOpen(true)
+  }
+
+  const handleDeleteProjectClick = (project: Project) => {
+    setProjectToDelete(project)
+    setIsDeleteAlertOpen(true)
+  }
+
+  const handleConfirmDelete = async () => {
+    if (!projectToDelete) return
+    setIsDeleting(true)
+    try {
+      await ApiClient.delete(`/projects/${projectToDelete.id}`)
+      toast.success("Project deleted successfully")
+
+      // Clear the active project if it was the one deleted
+      if (activeProject?.id === projectToDelete.id) {
+        useProjectStore.getState().clearActiveProject()
+      }
+
+      fetchProjects()
+    } catch (error: any) {
+      console.error("Error deleting project:", error)
+      toast.error(error.message || "Failed to delete project")
+    } finally {
+      setIsDeleting(false)
+      setIsDeleteAlertOpen(false)
+      setProjectToDelete(null)
+    }
+  }
 
   const fetchProjects = async () => {
     setIsLoading(true)
@@ -157,12 +215,31 @@ export default function Projects() {
           ) : (
             <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
               {filteredProjects.map((project) => (
-                <ProjectCard
-                  key={project.id}
-                  project={project}
-                  isActive={activeProject?.id === project.id}
-                  onOpen={() => handleOpenProject(project)}
-                />
+                <ContextMenu key={project.id}>
+                  <ContextMenuTrigger>
+                    <ProjectCard
+                      project={project}
+                      isActive={activeProject?.id === project.id}
+                      onOpen={() => handleOpenProject(project)}
+                    />
+                  </ContextMenuTrigger>
+                  <ContextMenuContent className="w-48 bg-card border border-border text-foreground">
+                    <ContextMenuItem
+                      onClick={() => handleEditProject(project)}
+                      className="cursor-pointer flex items-center gap-2 px-3 py-2 text-sm hover:bg-accent hover:text-accent-foreground"
+                    >
+                      <Pencil size={14} className="text-muted-foreground" />
+                      <span>Edit Project</span>
+                    </ContextMenuItem>
+                    <ContextMenuItem
+                      onClick={() => handleDeleteProjectClick(project)}
+                      className="cursor-pointer flex items-center gap-2 px-3 py-2 text-sm text-destructive hover:bg-destructive/10 hover:text-destructive focus:bg-destructive/10 focus:text-destructive"
+                    >
+                      <Trash2 size={14} className="text-destructive" />
+                      <span>Delete Project</span>
+                    </ContextMenuItem>
+                  </ContextMenuContent>
+                </ContextMenu>
               ))}
             </div>
           )}
@@ -174,6 +251,40 @@ export default function Projects() {
         onClose={() => setIsCreateModalOpen(false)}
         onSuccess={fetchProjects}
       />
+
+      <EditProjectModal
+        isOpen={isEditModalOpen}
+        project={projectToEdit}
+        onClose={() => {
+          setIsEditModalOpen(false)
+          setProjectToEdit(null)
+        }}
+        onSuccess={fetchProjects}
+      />
+
+      <AlertDialog open={isDeleteAlertOpen} onOpenChange={setIsDeleteAlertOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="text-destructive">Delete Project</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete <strong>{projectToDelete?.name}</strong>? This action will permanently delete all related activities, features, issues, messages, and project data. This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isDeleting}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={(e) => {
+                e.preventDefault()
+                handleConfirmDelete()
+              }}
+              disabled={isDeleting}
+              className="bg-destructive hover:bg-destructive/90 text-destructive-foreground"
+            >
+              {isDeleting ? "Deleting..." : "Delete Permanently"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
 
   )

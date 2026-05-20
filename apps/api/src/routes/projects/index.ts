@@ -362,13 +362,116 @@ export async function projectsRoutes(fastify: FastifyInstance) {
   fastify.delete<{ Params: { id: string } }>(
     "/projects/:id",
     async (request, reply) => {
+      const { id } = request.params
       try {
-        await fastify.prisma.project.delete({
-          where: { id: request.params.id },
+        // Fetch all related entities' IDs to delete their child relations first
+        const [features, activities, issues, chatRooms, complaints] = await Promise.all([
+          fastify.prisma.feature.findMany({ where: { projectId: id }, select: { id: true } }),
+          fastify.prisma.activity.findMany({ where: { projectId: id }, select: { id: true } }),
+          fastify.prisma.issue.findMany({ where: { projectId: id }, select: { id: true } }),
+          fastify.prisma.chatRoom.findMany({ where: { projectId: id }, select: { id: true } }),
+          fastify.prisma.complaint.findMany({ where: { projectId: id }, select: { id: true } }),
+        ])
+
+        const featureIds = features.map((f: any) => f.id)
+        const activityIds = activities.map((a: any) => a.id)
+        const issueIds = issues.map((i: any) => i.id)
+        const chatRoomIds = chatRooms.map((c: any) => c.id)
+        const complaintIds = complaints.map((c: any) => c.id)
+
+        // Execute robust cascading delete within a Prisma transaction
+        await fastify.prisma.$transaction(async (tx: any) => {
+          // 1. Delete ActivityUser mappings
+          if (activityIds.length > 0) {
+            await tx.activityUser.deleteMany({
+              where: { activityId: { in: activityIds } },
+            })
+          }
+
+          // 2. Delete Activities
+          await tx.activity.deleteMany({
+            where: { projectId: id },
+          })
+
+          // 3. Delete KanbanColumns
+          await tx.kanbanColumn.deleteMany({
+            where: { projectId: id },
+          })
+
+          // 4. Delete IssueAssignments & IssueUpdates
+          if (issueIds.length > 0) {
+            await tx.issueAssignment.deleteMany({
+              where: { issueId: { in: issueIds } },
+            })
+            await tx.issueUpdate.deleteMany({
+              where: { issueId: { in: issueIds } },
+            })
+          }
+
+          // 5. Delete Issues
+          await tx.issue.deleteMany({
+            where: { projectId: id },
+          })
+
+          // 6. Delete MaintenanceSchedules
+          if (featureIds.length > 0) {
+            await tx.maintenanceSchedule.deleteMany({
+              where: { featureId: { in: featureIds } },
+            })
+          }
+
+          // 7. Delete Features (cascade child features first by targeting roots, then remaining)
+          await tx.feature.deleteMany({
+            where: { projectId: id, parentId: null },
+          })
+          await tx.feature.deleteMany({
+            where: { projectId: id },
+          })
+
+          // 8. Delete Chat Messages & Participants
+          if (chatRoomIds.length > 0) {
+            await tx.message.deleteMany({
+              where: { roomId: { in: chatRoomIds } },
+            })
+            await tx.chatParticipant.deleteMany({
+              where: { roomId: { in: chatRoomIds } },
+            })
+          }
+
+          // 9. Delete ChatRooms
+          await tx.chatRoom.deleteMany({
+            where: { projectId: id },
+          })
+
+          // 10. Delete Feedbacks & Complaints
+          if (complaintIds.length > 0) {
+            await tx.feedback.deleteMany({
+              where: { complaintId: { in: complaintIds } },
+            })
+          }
+          await tx.complaint.deleteMany({
+            where: { projectId: id },
+          })
+
+          // 11. Delete Articles
+          await tx.article.deleteMany({
+            where: { projectId: id },
+          })
+
+          // 12. Delete ProjectMembers
+          await tx.projectMember.deleteMany({
+            where: { projectId: id },
+          })
+
+          // 13. Finally delete the Project itself
+          await tx.project.delete({
+            where: { id },
+          })
         })
 
         return reply.send({ message: "Project deleted successfully" })
       } catch (error) {
+        console.error("Error in transaction project deletion:", error)
         reply.status(500).send({
           error: "Failed to delete project",
           message: error instanceof Error ? error.message : "Unknown error",
